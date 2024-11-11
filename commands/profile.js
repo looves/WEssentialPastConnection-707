@@ -78,12 +78,12 @@ module.exports = {
             name: 'Looking for:',
             value: user.searchText && user.searchText.trim() !== '' 
               ? `<:dot:1291582825232994305>${user.searchText}` 
-              : `<:dot:1291582825232994305>You are not currently searching for any cards.`,
+              : `<:dot:1291582825232994305>Actualmente no estás buscando ninguna carta.`,
             inline: false
           },
           { name: 'Amount of cards:', value: `<:dot:1291582825232994305>**${user.cardCount}** cards`, inline: true },
           { name: 'Daily streak:', value: `<:dot:1291582825232994305>**${user.currentStreak}** days.`, inline: true }, // Mostrar la racha diaria
-          { name: 'Favorite card:', value: '\n', inline: false } // Agregado para mostrar la carta favorita
+          { name: `Favorite card:`, value: `-# <:dot:1291582825232994305>${favoriteCardName}`, inline: false } // Agregado para mostrar la carta favorita
         );
 
       // Solo establece la imagen si existe una carta favorita

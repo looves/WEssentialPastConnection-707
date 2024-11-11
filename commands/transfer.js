@@ -3,7 +3,8 @@ const DroppedCard = require('../models/DroppedCard');
 const Card = require('../models/Card');
 const User = require('../models/User');
 const rarityToEmojis = require('../utils/rarityToEmojis');
-const transactionGuard = require('../utils/transactionGuard');  // Importar el utils de transacciones
+const transactionGuard = require('../utils/transactionGuard');
+const checkBan = require('../utils/checkBan');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -28,6 +29,16 @@ module.exports = {
     const dinero = interaction.options.getInteger('coins');
     const usuarioIniciador = interaction.user;
 
+    // Verificación de baneo del usuario iniciador
+    if (await checkBan(usuarioIniciador.id)) {
+      return interaction.reply({ content: `No puedes usar \`/transfer\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`, ephemeral: true });
+    }
+
+    // Verificación de baneo del usuario receptor
+    if (await checkBan(usuario.id)) {
+      return interaction.reply({ content: `El usuario **${usuario.username}** está baneado y no puede recibir transferencias.`, ephemeral: true });
+    }
+    
     if (usuario.id === usuarioIniciador.id) {
       return interaction.reply({ content: 'No puedes transferir cartas o dinero a ti mismo.', ephemeral: true });
     }
@@ -93,14 +104,14 @@ module.exports = {
             );
             collector.stop();
           } else if (i.customId === 'cancel_transfer_money') {
-            await interaction.editReply({ content: 'La transferencia de dinero ha sido cancelada.', embeds: [], components: [] });
+            await interaction.reply({ content: 'La transferencia de dinero ha sido cancelada.', embeds: [], components: [] });
             collector.stop();
           }
         });
 
         collector.on('end', collected => {
           if (!collected.size) {
-            interaction.editReply({ content: 'El tiempo para aceptar la transferencia de dinero ha expirado.', embeds: [], components: [] });
+            interaction.reply({ content: 'El tiempo para aceptar la transferencia de dinero ha expirado.', embeds: [], components: [] });
           }
         });
 
@@ -112,7 +123,7 @@ module.exports = {
         const cartaDroppada = await DroppedCard.findOne({ userId: usuarioIniciador.id, uniqueCode: codigo }).populate('cardId');
 
         if (!cartaDroppada) {
-          return interaction.reply({ content: 'No posees la carta que intentas transferir.', ephemeral: true });
+          return interaction.reply({ content: `No posees la carta que intentas transferir.\n-# Solo puedes transferir una carta a la vez. (posible error)`, ephemeral: true });
         }
 
         const cartaOriginal = cartaDroppada.cardId;

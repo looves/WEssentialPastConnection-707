@@ -1,11 +1,12 @@
 // rarityUtils.js
 
 const BOOSTER_ROLE_ID = '1077366130915672165'; // Reemplaza con el ID real del rol booster
+const PATREON_ROLE_ID = '1281839512829558844'; // Reemplaza con el ID real del rol patreon
 
 const rarityProbabilities = {
   1: 70, // Común
-  2: 20, // Poco común
-  3: 10  // Raro
+  2: 27, // Poco común
+  3: 3  // Raro
 };
 
 function getRandomRarity(probabilities) {
@@ -22,12 +23,25 @@ function getRandomRarity(probabilities) {
 
 async function selectCard(cards, member) {
   const hasBoosterRole = member.roles.cache.has(BOOSTER_ROLE_ID);
+  const hasPatreonRole = member.roles.cache.has(PATREON_ROLE_ID);
 
-  const selectedRarity = getRandomRarity(hasBoosterRole ? {
-    1: 60, // Aumentar la probabilidad de común
-    2: 40, // Aumentar la probabilidad de poco común
-    3: 20  // Mantener la probabilidad de raro
-  } : rarityProbabilities);
+  let selectedRarity;
+
+  if (hasBoosterRole) {
+    selectedRarity = getRandomRarity({
+      1: 57, // Aumentar la probabilidad de común para Booster
+      2: 35, // Aumentar la probabilidad de poco común para Booster
+      3: 8  // Mantener la probabilidad de raro para Booster
+    });
+  } else if (hasPatreonRole) {
+    selectedRarity = getRandomRarity({
+      1: 48, // Aumentar la probabilidad de común para Patreon
+      2: 40, // Aumentar la probabilidad de poco común para Patreon
+      3: 12  // Aumentar la probabilidad de raro para Patreon
+    });
+  } else {
+    selectedRarity = getRandomRarity(rarityProbabilities);
+  }
 
   // Filtrar cartas por la rareza seleccionada
   const filteredCards = cards.filter(card => card.rarity == selectedRarity);

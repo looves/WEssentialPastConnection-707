@@ -3,6 +3,11 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 const Card = require('../models/Card');
 const DroppedCard = require('../models/DroppedCard');
 
+// Función para escapar caracteres especiales en una expresión regular
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'); // Escapa todos los caracteres especiales
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('checklist')
@@ -21,20 +26,29 @@ module.exports = {
 
     try {
       let filter = {};
-      if (idolFilter) filter.idol = new RegExp(idolFilter, 'i');
-      if (grupoFilter) filter.grupo = new RegExp(grupoFilter, 'i');
 
+      // Si hay filtro para idol, lo añadimos
+      if (idolFilter) filter.idol = new RegExp(idolFilter, 'i');
+
+      // Si hay filtro para grupo, lo escapamos y lo añadimos
+      if (grupoFilter) {
+        const escapedGrupoFilter = escapeRegExp(grupoFilter.trim());
+        filter.grupo = new RegExp(escapedGrupoFilter, 'i'); // Búsqueda insensible a mayúsculas/minúsculas
+      }
+
+      // Buscar las cartas que coinciden con el filtro
       const allCards = await Card.find(filter);
       if (allCards.length === 0) {
         return interaction.reply(`No se encontraron cartas para el idol ${idolFilter || ''} en el grupo ${grupoFilter || ''}.`);
       }
 
+      // Buscar las cartas que el usuario ya tiene
       const userCards = await DroppedCard.find({ userId: interaction.user.id });
       const checklist = {};
 
       // Acumular los ídolos en el checklist
       allCards.forEach(card => {
-        const key = `${card.grupo}-${card.era}-${card.eshort}`;
+        const key = `${card.grupo}|${card.era}|${card.eshort}`;
         if (!checklist[key]) {
           checklist[key] = {};
         }
@@ -43,6 +57,7 @@ module.exports = {
           checklist[key][card.idol] = { rarity1: false, rarity2: false, rarity3: false };
         }
 
+        // Verificar si el usuario tiene la carta
         const hasCard = userCards.find(droppedCard =>
           droppedCard.idol === card.idol &&
           droppedCard.grupo === card.grupo &&
@@ -68,6 +83,7 @@ module.exports = {
       let currentPage = 0;
       const totalPages = Math.ceil(entries.length / itemsPerPage);
 
+      // Función para crear el embed
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
           .setTitle('CHECKLIST CARDS')
@@ -79,7 +95,7 @@ module.exports = {
         let description = '';
 
         entries.slice(start, end).forEach(([key, idols]) => {
-          const [grupo, era, eshort] = key.split('-');
+          const [grupo, era, eshort] = key.split('|');
 
           description += `<:last:1290467815127519322> **${grupo}**\n` +
                          `_ _ <:next:1290467800065769566> ${era} \`${eshort}\`\n`;
@@ -101,35 +117,42 @@ module.exports = {
         return embed;
       };
 
-
-
+      // Función para crear los botones de navegación
       const createButtons = (page) => {
         return new ActionRowBuilder()
           .addComponents(
             new ButtonBuilder()
               .setCustomId('first')
               .setEmoji("<:first:1290467842462060605>")
-              .setStyle(ButtonStyle.Secondary) // Color plomo
+              .setStyle(ButtonStyle.Secondary)
               .setDisabled(page === 0),
             new ButtonBuilder()
               .setCustomId('prev')
               .setEmoji("<:prev:1290467827739787375>")
-              .setStyle(ButtonStyle.Secondary) // Color plomo
+              .setStyle(ButtonStyle.Secondary)
               .setDisabled(page === 0),
+            new ButtonBuilder()
+              .setCustomId('close')
+              .setEmoji("<:close:1290467856437481574>")
+              .setStyle(ButtonStyle.Danger),
             new ButtonBuilder()
               .setCustomId('next')
               .setEmoji("<:next:1290467800065769566>")
-              .setStyle(ButtonStyle.Secondary) // Color plomo
+              .setStyle(ButtonStyle.Secondary)
               .setDisabled(page === totalPages - 1),
             new ButtonBuilder()
               .setCustomId('last')
               .setEmoji("<:last:1290467815127519322>")
-              .setStyle(ButtonStyle.Secondary) // Color plomo
+              .setStyle(ButtonStyle.Secondary)
               .setDisabled(page === totalPages - 1)
           );
       };
 
-      await interaction.reply({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
+      // Deferir la respuesta para habilitar los botones interactivos
+      await interaction.deferReply();
+
+      // Enviar la respuesta inicial
+      await interaction.editReply({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
 
       const collector = interaction.channel.createMessageComponentCollector({ time: 60000 });
 
@@ -140,8 +163,13 @@ module.exports = {
         if (i.customId === 'prev' && currentPage > 0) currentPage--;
         if (i.customId === 'next' && currentPage < totalPages - 1) currentPage++;
         if (i.customId === 'last') currentPage = totalPages - 1;
+        if (i.customId === 'close') {
+          await i.update({ content: '**/checklist cerrado**', embeds: [], components: [] });
+          collector.stop();  // Detener el colector cuando se cierre
+          return;
+        }
 
-        await i.update({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
+
       });
 
       collector.on('end', async () => {
@@ -150,7 +178,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Error en el comando /checklist:', error);
-      await interaction.reply('Hubo un error al procesar el comando.');
+      await interaction.editReply('Hubo un error al procesar el comando.');
     }
   },
 };

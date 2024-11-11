@@ -22,10 +22,11 @@ module.exports = {
   async execute(interaction) {
     const uniqueCode = interaction.options.getString('code');
 
-
     try {
+    
+
       // Buscar la carta usando el código
-      const droppedCard = await DroppedCard.findOne({ uniqueCode}).populate('cardId');
+      const droppedCard = await DroppedCard.findOne({ uniqueCode }).populate('cardId');
 
       if (!droppedCard) {
         return interaction.reply({ content: 'No tienes una carta con ese código en tu inventario.', ephemeral: true });
@@ -41,16 +42,17 @@ module.exports = {
 
       // Obtener el usuario propietario de la carta
       const owner = await interaction.client.users.fetch(droppedCard.userId);
-      
-        const imgUrl = card.image;
-        const extension = getImageExtension(imgUrl);
-        const fileCard = `${cardCode}${extension}`; 
+
+      const imgUrl = card.image;
+      const extension = getImageExtension(imgUrl);
+      const fileCard = `${cardCode}${extension}`; 
 
       // Crea y envía el embed
       const embed = new EmbedBuilder()
-      .setColor('#60a5fa')
-      .setFooter({ text: `Looking at ${owner.username}'s card`, iconURL: owner.displayAvatarURL() })      .setTitle(`Card details: `)
-      .setDescription(`\`${card.idol}\` de **${card.grupo}** ${card.eshort} <:dot:1291582825232994305>\`#${droppedCard.copyNumber}\` \n\`\`\`${droppedCard.uniqueCode}\`\`\``);
+        .setColor('#60a5fa')
+        .setFooter({ text: `Looking at ${owner.username}'s card`, iconURL: owner.displayAvatarURL() })
+        .setTitle(`Card details: `)
+        .setDescription(`\`${card.idol}\` de **${card.grupo}** ${card.eshort} <:dot:1291582825232994305>\`#${droppedCard.copyNumber}\` \n\`\`\`${droppedCard.uniqueCode}\`\`\``);
 
       // Envía la respuesta con la imagen de la carta
       await interaction.reply({

@@ -27,115 +27,147 @@ module.exports = {
         .setDescription('Rareza de la carta')
         .setRequired(false)),
 
-  async execute(interaction) {
-    const idol = interaction.options.getString('idol');
-    const grupo = interaction.options.getString('grupo');
-    const era = interaction.options.getString('era');
-    const eshort = interaction.options.getString('eshort');
-    const rarity = interaction.options.getString('rarity');
+async execute(interaction) {
+  const idolFilter = interaction.options.getString('idol');
+  const grupoFilter = interaction.options.getString('grupo');
+  const eraFilter = interaction.options.getString('era');
+  const eshortFilter = interaction.options.getString('eshort');
+  const rarity = interaction.options.getString('rarity');
 
-    const filters = {};
-    if (idol) filters.idol = { $regex: new RegExp(idol, 'i') };
-    if (grupo) filters.grupo = { $regex: new RegExp(grupo, 'i') };
-    if (era) filters.era = { $regex: new RegExp(era, 'i') };
-    if (eshort) filters.eshort = { $regex: new RegExp(eshort, 'i') };
-    if (rarity) filters.rarity = rarity;
-
+  try {
+ 
     try {
-      const droppedCards = await DroppedCard.find(filters);
-      const maxFields = 9;
-      const totalPages = Math.ceil(droppedCards.length / maxFields);
-      let currentPage = 0;
+      await interaction.deferReply();
+    } catch (error) {
+      // Si hay un error al deferir la respuesta, simplemente hacer un return para evitar que el bot se caiga
+      console.error('Error al deferir la respuesta:', error);
+      return; // Termina la ejecución del comando si ocurre un error
+    }// Defer the reply immediately
 
-      if (droppedCards.length === 0) {
-        return interaction.reply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
+    const allDroppedCards = await DroppedCard.find();
+    let filteredCards = allDroppedCards;
+
+    const cleanString = (str) => {
+      return String(str).replace(/[^\w\s]/g, '').toLowerCase(); // Limpiar caracteres especiales
+    };
+
+    if (idolFilter) {
+      filteredCards = filteredCards.filter(card => card.idol && card.idol.toLowerCase().includes(idolFilter.toLowerCase()));
+    }
+    if (grupoFilter) {
+      filteredCards = filteredCards.filter(card => card.grupo && cleanString(card.grupo).includes(cleanString(grupoFilter)));
+    }    
+    if (eraFilter) {
+      filteredCards = filteredCards.filter(card => card.era && cleanString(card.era).includes(cleanString(eraFilter)));
+    }
+    if (eshortFilter) {
+      filteredCards = filteredCards.filter(card => card.eshort && card.eshort.toLowerCase().includes(eshortFilter.toLowerCase()));
+    }
+    if (rarity) {
+      filteredCards = filteredCards.filter(card => card.rarity === rarity);
+    }
+
+    const maxFields = 9;
+    const totalPages = Math.ceil(filteredCards.length / maxFields);
+    let currentPage = 0;
+
+    if (filteredCards.length === 0) {
+      return interaction.editReply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
+    }
+
+    const createEmbed = (page) => {
+      const embed = new EmbedBuilder()
+        .setAuthor({ name: `${filteredCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
+        .setTimestamp()
+        .setColor('#60a5fa')
+        .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
+
+      const startIndex = page * maxFields;
+      const endIndex = Math.min(startIndex + maxFields, filteredCards.length);
+      for (let i = startIndex; i < endIndex; i++) {
+        const card = filteredCards[i];
+        embed.addFields({
+          name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
+          value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
+          inline: true,
+        });
+      }
+      return embed;
+    };
+
+    const getButtonRow = (currentPage, totalPages) => {
+      const row = new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('first')
+            .setEmoji("<:first:1290467842462060605>")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(currentPage === 0),
+          new ButtonBuilder()
+            .setCustomId('previous')
+            .setEmoji("<:prev:1290467827739787375>")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(currentPage === 0),
+          new ButtonBuilder()
+            .setCustomId('close')
+            .setEmoji("<:close:1290467856437481574>")
+            .setStyle(ButtonStyle.Danger),
+          new ButtonBuilder()
+            .setCustomId('next')
+            .setEmoji("<:next:1290467800065769566>")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(currentPage >= totalPages - 1),
+          new ButtonBuilder()
+            .setCustomId('last')
+            .setEmoji("<:last:1290467815127519322>")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(currentPage >= totalPages - 1)
+        );
+
+      return row;
+    };
+
+    // Muestra la respuesta inicial con los botones
+    const message = await interaction.editReply({
+      embeds: [createEmbed(currentPage)],
+      components: [getButtonRow(currentPage, totalPages)],
+    });
+
+    // Configura el colector de botones
+    const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
+
+    collector.on('collect', async i => {
+      if (i.user.id !== interaction.user.id) {
+        return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
       }
 
-      const createEmbed = (page) => {
-        const embed = new EmbedBuilder()
-          .setAuthor({ name: `${droppedCards.length} cards in total`, iconURL: interaction.user.displayAvatarURL() })
-          .setTimestamp()
-          .setColor('#60a5fa')
-          .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
+      if (i.customId === 'previous' && currentPage > 0) {
+        currentPage--;
+      } else if (i.customId === 'next' && currentPage < totalPages - 1) {
+        currentPage++;
+      } else if (i.customId === 'first') {
+        currentPage = 0;
+      } else if (i.customId === 'last') {
+        currentPage = totalPages - 1;
+      } else if (i.customId === 'close') {
+        await i.update({ content: '**/global cerrado...**', embeds: [], components: [] });
+        return collector.stop();
+      }
 
-        const startIndex = page * maxFields;
-        const endIndex = Math.min(startIndex + maxFields, droppedCards.length);
-        for (let i = startIndex; i < endIndex; i++) {
-          const card = droppedCards[i];
-          embed.addFields({
-            name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
-            value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\`<@${card.userId}>`,
-            inline: true,
-          });
-        }
-        return embed;
-      };
-
-      // Mueve esta función aquí arriba
-      const getButtonRow = (currentPage, totalPages) => {
-        const row = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('first')
-              .setEmoji("<:first:1290467842462060605>")
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(currentPage === 0),
-            new ButtonBuilder()
-              .setCustomId('previous')
-              .setEmoji("<:prev:1290467827739787375>")
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(currentPage === 0),
-            new ButtonBuilder()
-              .setCustomId('close')
-              .setEmoji("<:close:1290467856437481574>")
-              .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-              .setCustomId('next')
-              .setEmoji("<:next:1290467800065769566>")
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(currentPage >= totalPages - 1),
-            new ButtonBuilder()
-              .setCustomId('last')
-              .setEmoji("<:last:1290467815127519322>")
-              .setStyle(ButtonStyle.Secondary)
-              .setDisabled(currentPage >= totalPages - 1)
-          );
-
-        return row;
-      };
-
-      const message = await interaction.reply({ embeds: [createEmbed(currentPage)], components: [getButtonRow(currentPage, totalPages)], fetchReply: true });
-
-      const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
-
-      collector.on('collect', async i => {
-        if (i.user.id !== interaction.user.id) {
-          return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
-        }
-
-        if (i.customId === 'previous' && currentPage > 0) {
-          currentPage--;
-        } else if (i.customId === 'next' && currentPage < totalPages - 1) {
-          currentPage++;
-        } else if (i.customId === 'first') {
-          currentPage = 0;
-        } else if (i.customId === 'last') {
-          currentPage = totalPages - 1;
-        } else if (i.customId === 'close') {
-          await i.update({ content: 'Global cerrado...', embeds: [], components: [] });
-          return collector.stop();
-        }
-
-        await i.update({ embeds: [createEmbed(currentPage)], components: [getButtonRow(currentPage, totalPages)] });
+      // Aquí se usa i.update() correctamente
+      await i.update({
+        embeds: [createEmbed(currentPage)],
+        components: [getButtonRow(currentPage, totalPages)],
       });
+    });
 
-      collector.on('end', async () => {
-        await message.edit({ components: [] });
-      });
+    collector.on('end', async () => {
+      await message.edit({ components: [] }); // Se eliminan los botones después de que termine la interacción
+    });
 
-    } catch (error) {
-      console.error('Error al ejecutar el comando /global:', error);
-      await interaction.reply({ content: 'Ocurrió un error al buscar las cartas. Por favor, inténtalo de nuevo.', ephemeral: true });
-    }
-  },
+  } catch (error) {
+    console.error('Error al ejecutar el comando /global:', error);
+    await interaction.editReply({ content: 'Ocurrió un error al buscar las cartas. Por favor, inténtalo de nuevo.', ephemeral: true });
+  }
+}
 };

@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const DroppedCard = require('../models/DroppedCard');
 const rarityToEmojis = require('../utils/rarityToEmojis');
+const checkBan = require('../utils/checkBan');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -24,6 +25,16 @@ module.exports = {
     const pedirCodes = interaction.options.getString('request').split(' ').map(code => code.trim());
     const usuarioIniciador = interaction.user;
 
+    // Verificar si el usuario que inicia el intercambio está baneado
+    if (await checkBan(usuarioIniciador.id)) {
+      return interaction.reply({ content: `No puedes usar \`/trade\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`, ephemeral: true });
+    }
+
+    // Verificar si el usuario receptor está baneado
+    if (await checkBan(usuario.id)) {
+      return interaction.reply({ content: `El usuario **${usuario.username}** está baneado y no puede participar en trades.`, ephemeral: true });
+    }
+    
     if (usuario.id === usuarioIniciador.id) {
       return interaction.reply({ content: 'No puedes intercambiar cartas contigo mismo.', ephemeral: true });
     }

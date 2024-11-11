@@ -60,23 +60,31 @@ module.exports = {
     const idol = interaction.options.getString('idol');
 
     try {
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error al deferir la respuesta:', error);
+      return; // Termina la ejecución si no puede deferir la respuesta
+    }
+
+    try {
       // Validar que al menos haya proporcionado grupo o idol
       if (!grupo && !idol) {
-        return interaction.reply({ content: 'Debes proporcionar al menos un grupo o un idol.', ephemeral: true });
+        return interaction.editReply({ content: 'Debes proporcionar al menos un grupo o un idol.', ephemeral: true });
       }
 
       // Crear consulta para obtener cartas según el grupo o idol
       let query = {};
       if (idol) {
-        query.idol = { $regex: new RegExp(idol, 'i') }; // Usar idol si se proporciona
-      } else {
-        query.grupo = { $regex: new RegExp(grupo, 'i') }; // Usar grupo si no se proporciona idol
+        query.idol = { $regex: new RegExp(idol, 'i') }; // Si se proporciona idol, buscamos por idol
+      }
+      if (grupo) {
+        query.grupo = { $regex: new RegExp(grupo, 'i') }; // Si se proporciona grupo, buscamos por grupo
       }
 
       // Obtener todas las cartas disponibles que coinciden con el grupo o idol
       const allCards = await Card.find(query);
       if (allCards.length === 0) {
-        return interaction.reply({ content: 'No se encontraron cartas con los criterios proporcionados.', ephemeral: true });
+        return interaction.editReply({ content: 'No se encontraron cartas con los criterios proporcionados.', ephemeral: true });
       }
 
       // Obtener todas las cartas dropeadas por el usuario
@@ -87,8 +95,20 @@ module.exports = {
         droppedCard.cardId && allCards.some(card => card._id.equals(droppedCard.cardId._id))
       );
 
+      // Crear un objeto para contar solo una vez por combinación de idol, grupo, era y rareza
+      const uniqueCards = {};
+
+      userOwnedCards.forEach(droppedCard => {
+        const { idol, grupo, era, rarity } = droppedCard.cardId;
+        const key = `${idol}:${grupo}:${era}:${rarity}`; // Generamos una clave única por combinación
+
+        if (!uniqueCards[key]) {
+          uniqueCards[key] = true; // Si no existe, la contamos una sola vez
+        }
+      });
+
       const totalCards = allCards.length; // Total de cartas disponibles del grupo o idol
-      const ownedCards = Math.min(userOwnedCards.length, totalCards); // Cartas obtenidas
+      const ownedCards = Object.keys(uniqueCards).length; // Cartas obtenidas (solo contando una vez por combinación única)
       const missingCards = totalCards - ownedCards; // Cartas que faltan
       const progressPercentage = ((ownedCards / totalCards) * 100).toFixed(2); // Progreso en porcentaje
 
@@ -96,9 +116,9 @@ module.exports = {
       const searchQuery = idol ? idol : grupo; // Usar idol si se proporciona, si no, usar grupo
       const gifUrl = await fetchRandomGif(searchQuery); // Buscar GIF usando el nombre
 
-      // Crear el embed de progreso
+      // Crear el embed de progreso sin las rarezas
       const progressEmbed = new EmbedBuilder()
-        .setTitle(`Progreso de ${idol || grupo}`)
+        .setTitle(`Progreso de ${grupo.toUpperCase()}${idol ? ' - ' + idol.toUpperCase() : ''}`)
         .setDescription(`Has completado el **${progressPercentage}%** de las cartas de ${idol || grupo}.`)
         .addFields(
           { name: 'Cartas obtenidas:', value: `${ownedCards}/${totalCards}`, inline: true },
@@ -106,15 +126,19 @@ module.exports = {
         )
         .setColor('#60a5fa');
 
+      if (progressPercentage === '100.00') {
+        progressEmbed.setFooter({ text: '¡Felicidades! Has completado todas las cartas.' });
+      }
+
       // Añadir el GIF al embed si existe
       if (gifUrl) {
         progressEmbed.setImage(gifUrl);
       }
 
-      return interaction.reply({ embeds: [progressEmbed] });
+      return interaction.editReply({ embeds: [progressEmbed] });
     } catch (error) {
       console.error('Error al obtener el progreso:', error);
-      return interaction.reply({ content: 'Hubo un error al obtener tu progreso. Inténtalo de nuevo más tarde.', ephemeral: true });
+      return interaction.editReply({ content: 'Hubo un error al obtener tu progreso. Inténtalo de nuevo más tarde.', ephemeral: true });
     }
   },
 };

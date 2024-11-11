@@ -7,7 +7,6 @@ const Inventory = require("../models/Inventory");
  */
 const updateInventory = async (userId, cards) => {
   try {
-    // Obtener o crear el inventario del usuario
     let inventory = await Inventory.findOne({ userId });
 
     if (!inventory) {
@@ -29,11 +28,33 @@ const updateInventory = async (userId, cards) => {
       }
     }
 
-    // Guardar los cambios en el inventario
-    await inventory.save();
+    // Intentar guardar el inventario y manejar el error de versión
+    try {
+      await inventory.save();
+    } catch (versionError) {
+      if (versionError.name === 'VersionError') {
+        // Si hay un conflicto de versión, volvemos a cargar el inventario y repetimos el proceso
+        inventory = await Inventory.findOne({ userId });
+        for (const card of cards) {
+          const existingCard = inventory.cards.find(
+            (c) => c.cardId.toString() === card.cardId.toString()
+          );
+
+          if (existingCard) {
+            existingCard.count += card.count;
+          } else {
+            inventory.cards.push({ cardId: card.cardId, count: card.count });
+          }
+        }
+        await inventory.save(); // Guardar nuevamente
+      } else {
+        throw versionError; // Rethrow si no es un error de versión
+      }
+    }
+
   } catch (error) {
     console.error("Error al actualizar el inventario:", error);
-    throw new Error("No se pudo actualizar el inventario");
+    throw new Error("No se pudo actualizar el inventario.");
   }
 };
 

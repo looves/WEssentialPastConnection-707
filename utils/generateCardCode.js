@@ -11,8 +11,13 @@ const crypto = require('crypto');
 function generateCardCode(idol, grupo, era, rarity) {
     // Convertir los parámetros a cadena en caso de que no lo sean
     const idolInitial = String(idol).charAt(0).toUpperCase();
-    const grupoInitial = String(grupo).charAt(0).toUpperCase();
-    const eraInitial = String(era).charAt(0).toUpperCase();
+
+    // Limpiar el grupo y la era de caracteres especiales
+    const cleanedGrupo = String(grupo).replace(/[^\w\s]/g, '');
+    const cleanedEra = String(era).replace(/[^\w\s]/g, '');
+
+    const grupoInitial = cleanedGrupo.charAt(0).toUpperCase();
+    const eraInitial = cleanedEra.charAt(0).toUpperCase();
     const rarityInitial = String(rarity).charAt(0).toUpperCase();
 
     // Generar una secuencia aleatoria de 4 caracteres

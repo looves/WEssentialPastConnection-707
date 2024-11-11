@@ -21,6 +21,7 @@
     "mongodb": "^6.9.0",
     "mongoose": "^8.7.1",
     "node-fetch": "^3.3.2",
-    "sharp": "^0.33.5"
+    "sharp": "^0.33.5",
+    "topgg-votes": "^2.1.0"
   }
 }

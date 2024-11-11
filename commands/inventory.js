@@ -6,7 +6,7 @@ const rarityToEmojis = require('../utils/rarityToEmojis');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('inventory')
-    .setDescription('Muestra todas las cartas en tu inventario, separadas por copia.')
+    .setDescription('Muestra todas las cartas en tu inventario.')
     .addUserOption(option =>
       option.setName('user')
         .setDescription('Usuario cuyo inventario deseas ver.'))
@@ -27,6 +27,14 @@ module.exports = {
         .setDescription('Filtra por rareza de la carta.')),
 
   async execute(interaction) {
+    try {
+      // Defer the reply
+      await interaction.deferReply();
+    } catch (error) {
+      console.error('Error al deferir la respuesta:', error);
+      return; // Termina la ejecución del comando si ocurre un error
+    }
+
     const userId = interaction.options.getUser('user')?.id || interaction.user.id;
     const idolFilter = interaction.options.getString('idol');
     const grupoFilter = interaction.options.getString('grupo');
@@ -34,27 +42,32 @@ module.exports = {
     const eshortFilter = interaction.options.getString('eshort');
     const rarityFilter = interaction.options.getString('rarity');
 
-
     const user = await interaction.client.users.fetch(userId);
+    let isInteractionClosed = false; // Bandera para controlar si la interacción fue cerrada
 
     try {
       // Encuentra todas las cartas caídas del usuario
       const droppedCards = await DroppedCard.find({ userId });
 
       if (droppedCards.length === 0) {
-        return interaction.reply('No tienes cartas en tu inventario.');
+        return interaction.editReply('No tienes cartas en tu inventario.'); // Cambiado a editReply
       }
 
       // Filtrar las cartas según los criterios especificados
       let filteredCards = droppedCards;
+
+      const cleanString = (str) => {
+        return String(str).replace(/[^\w\s]/g, '').toLowerCase(); // Limpiar caracteres especiales
+      };
+
       if (idolFilter) {
         filteredCards = filteredCards.filter(card => card.idol && card.idol.toLowerCase().includes(idolFilter.toLowerCase()));
       }
       if (grupoFilter) {
-        filteredCards = filteredCards.filter(card => card.grupo && card.grupo.toLowerCase().includes(grupoFilter.toLowerCase()));
-      }
+        filteredCards = filteredCards.filter(card => card.grupo && cleanString(card.grupo).includes(cleanString(grupoFilter)));
+      }    
       if (eraFilter) {
-        filteredCards = filteredCards.filter(card => card.era && card.era.toLowerCase().includes(eraFilter.toLowerCase()));
+        filteredCards = filteredCards.filter(card => card.era && cleanString(card.era).includes(cleanString(eraFilter)));
       }
       if (eshortFilter) {
         filteredCards = filteredCards.filter(card => card.eshort && card.eshort.toLowerCase().includes(eshortFilter.toLowerCase()));
@@ -64,7 +77,7 @@ module.exports = {
       }      
 
       if (filteredCards.length === 0) {
-        return interaction.reply({ content: 'No se encontraron cartas en tu inventario que coincidan con los filtros especificados.', ephemeral: true });
+        return interaction.editReply({ content: 'No se encontraron cartas en tu inventario que coincidan con los filtros especificados.', ephemeral: true });
       }
 
       // Crea un mapa para guardar las cartas y sus detalles
@@ -90,7 +103,6 @@ module.exports = {
       });
 
       // Preparar la paginación basada en el número de cartas filtradas
-
       const totalCards = Object.keys(cardDetailsMap).length;
       const maxFields = 9; // Máximo de campos (fields) por página
       const totalPages = Math.ceil(totalCards / maxFields);
@@ -150,8 +162,8 @@ module.exports = {
       };
 
       // Enviar el primer embed y los botones
-      const message = await interaction.reply({
-        embeds: [generateEmbed(currentPage)],
+      const message = await interaction.editReply({
+        embeds: [generateEmbed(currentPage)], // editReply en lugar de reply
         components: [getButtonRow(currentPage)],
         fetchReply: true
       });
@@ -164,6 +176,10 @@ module.exports = {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
 
+        if (isInteractionClosed) {
+          return; // Si la interacción ya fue cerrada, no realizamos ninguna acción
+        }
+
         if (i.customId === 'previous' && currentPage > 0) {
           currentPage--;
         } else if (i.customId === 'next' && currentPage < totalPages - 1) {
@@ -173,20 +189,21 @@ module.exports = {
         } else if (i.customId === 'last') {
           currentPage = totalPages - 1;
         } else if (i.customId === 'close') {
-          await i.update({ content: 'Inventario cerrado...', embeds: [], components: [] });
-          return collector.stop(); // Detener el colector cuando se cierre el inventario
+          isInteractionClosed = true; 
+          return collector.stop(); // Detener el colector después de cerrar
         }
 
+        // Solo actualizamos si la interacción no fue cerrada
         await i.update({ embeds: [generateEmbed(currentPage)], components: [getButtonRow(currentPage)] });
       });
 
       collector.on('end', async () => {
-        await message.edit({ components: [] });
+        await message.edit({ content: '**/inventory cerrado...**', embeds: [], components: [] });
       });
 
     } catch (error) {
       console.error('Error al ejecutar el comando /inventory:', error);
-      await interaction.reply('Ocurrió un error al procesar el comando.');
+      await interaction.editReply('Ocurrió un error al procesar el comando.'); // Cambiado a editReply
     }
   },
 };

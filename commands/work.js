@@ -1,6 +1,8 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder } = require('discord.js');
 const User = require('../models/User');
+const Card = require('../models/Card');
+const DroppedCard = require('../models/DroppedCard');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -29,18 +31,24 @@ module.exports = {
           const remainingTime = cooldownTime - timeElapsed;
           const minutes = Math.floor(remainingTime / 60000);
           const seconds = Math.floor((remainingTime % 60000) / 1000);
-          return interaction.reply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando /work nuevamente!`);
+          return interaction.reply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando \`/work\` nuevamente!`);
         }
       }
 
       // Verifica si el usuario tiene una carta favorita definida
       if (!user.favoriteCard) {
-        return interaction.reply({ content: 'No puedes usar el comando `/work` sin una carta favorita definida. Establece una carta favorita primero.', ephemeral: true });
+        return interaction.reply({ content: `No puedes usar el comando \`/work\` sin una carta favorita definida. Establece una carta favorita primero.`, ephemeral: true });
+      }
+
+      // Busca la carta favorita del usuario usando el valor de favoriteCard como una cadena
+      const favoriteCard = await DroppedCard.findOne({ uniqueCode: user.favoriteCard });
+      if (!favoriteCard) {
+        return interaction.reply({ content: 'No se encontró tu carta favorita. Establece una carta favorita válida.', ephemeral: true });
       }
 
       // Genera un número aleatorio entre 25 y 65
       const min = 25;
-      const max = 75;
+      const max = 65;
       const earnedCoins = Math.floor(Math.random() * (max - min + 1)) + min;
 
       // Actualiza el saldo de monedas del usuario
@@ -50,18 +58,38 @@ module.exports = {
       user.lastWork = new Date();
       await user.save();
 
+      // Mensajes aleatorios
+      const workplaces = [
+        'la oficina', 
+        'un restaurante', 
+        'un estudio de grabación', 
+        'un parque', 
+        'una tienda de cómics'];
+
+      const tragedies = [
+        'desafortunadamente, el jefe decidió cerrar la empresa',
+        'fueron despedidos de manera inesperada',
+        'su supervisor le dijo que no era lo suficientemente bueno',
+        'tuvieron que salir corriendo al robar el puesto de helados',
+        'y no pudo contener las lágrimas al enterarse del despido'
+      ];
+
+      // Elegir lugares y tragedias aleatoriamente
+      const workplace = workplaces[Math.floor(Math.random() * workplaces.length)];
+      const tragedyMessage = tragedies[Math.floor(Math.random() * tragedies.length)];
+
       // Crea el embed para mostrar la cantidad de monedas ganadas
       const embed = new EmbedBuilder()
         .setColor('#60a5fa')
-        .setAuthor({ name: `Trabajo Completado!`, value: interaction.user.displayAvatarURL() })
-        .setDescription(`<:dot:1291582825232994305><@${user.userId}>, has ganado ${earnedCoins} :coin: coins!`)
-        .setImage('https://imgur.com/m27u56C.jpg');
+        .setAuthor({ name: `Trabajo Completado!`, iconURL: interaction.user.displayAvatarURL() })
+        .setDescription(`**${favoriteCard.idol}** y **${interaction.user.username}** fueron a trabajar a ${workplace} y ganaron ${earnedCoins} coins!\n**Después ${tragedyMessage}.**`)
+        .setImage('https://imgur.com/yblBKFR.jpg');
 
       await interaction.reply({ embeds: [embed] });
 
       // Configura la notificación para cuando el cooldown haya pasado
       setTimeout(() => {
-        interaction.channel.send(`<@${userId}>, el comando **/work** ya está disponible nuevamente!`).catch(console.error);
+        interaction.channel.send(`<@${userId}>, el comando \`/work\` ya está disponible nuevamente!`).catch(console.error);
       }, cooldownTime);
 
     } catch (error) {

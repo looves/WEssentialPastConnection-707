@@ -53,6 +53,10 @@ client.on('ready', () => {
   setInterval(() => {
     let status = [
       {
+        name: `join to .gg/wonho`,
+        type: Discord.ActivityType.Playing,
+      },
+      {
         name: `responding to commands...`,
         type: Discord.ActivityType.Custom,
       },
