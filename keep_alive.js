@@ -1,6 +1,10 @@
-var http = require('http');
+const express = require('express')
+const app = express()
+const port = process.env.PORT || 4000;
+app.get('/', (req, res) => {
+  res.send('Hello World!')
+})
 
-http.createServer(function (req, res) {
-    res.write("Wonho is on!"); // Escribiendo en la respuesta
-    res.end('Ready to play cards'); // Enviando la respuesta y finalizando
-}).listen(8080);
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
+})
