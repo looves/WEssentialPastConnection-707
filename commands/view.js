@@ -23,13 +23,14 @@ module.exports = {
     const uniqueCode = interaction.options.getString('code');
 
     try {
-    
+      // Defer the reply to prevent timeout while fetching data
+      await interaction.deferReply();
 
       // Buscar la carta usando el código
       const droppedCard = await DroppedCard.findOne({ uniqueCode }).populate('cardId');
 
       if (!droppedCard) {
-        return interaction.reply({ content: 'No tienes una carta con ese código en tu inventario.', ephemeral: true });
+        return interaction.editReply({ content: 'No tienes una carta con ese código en tu inventario.', ephemeral: true });
       }
 
       const card = droppedCard.cardId;
@@ -37,7 +38,7 @@ module.exports = {
       const cardCode = cardCodeImg(card.idol, card.grupo, card.era, card.rarity); 
 
       if (!card) {
-        return interaction.reply({ content: 'No se encontró la carta.', ephemeral: true });
+        return interaction.editReply({ content: 'No se encontró la carta.', ephemeral: true });
       }
 
       // Obtener el usuario propietario de la carta
@@ -55,7 +56,7 @@ module.exports = {
         .setDescription(`\`${card.idol}\` de **${card.grupo}** ${card.eshort} <:dot:1291582825232994305>\`#${droppedCard.copyNumber}\` \n\`\`\`${droppedCard.uniqueCode}\`\`\``);
 
       // Envía la respuesta con la imagen de la carta
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [embed],
         files: [{
           attachment: imgUrl, 
@@ -65,7 +66,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Error al ejecutar el comando view:', error);
-      await interaction.reply({ content: 'Ocurrió un error al procesar el comando.', ephemeral: true });
+      await interaction.editReply({ content: 'Ocurrió un error al procesar el comando.', ephemeral: true });
     }
   },
 };
