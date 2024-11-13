@@ -1,4 +1,5 @@
 // dependencias
+const keep_alive = require(`./keep_alive.js`);
 const Discord = require('discord.js');
 const fs = require('fs');
 const mongoose = require('mongoose');
