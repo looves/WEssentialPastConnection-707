@@ -28,7 +28,7 @@ module.exports = {
 
   async execute(interaction) {
     try {
-      // Defer the reply
+      // Deferir la respuesta
       await interaction.deferReply();
     } catch (error) {
       console.error('Error al deferir la respuesta:', error);
@@ -43,7 +43,6 @@ module.exports = {
     const rarityFilter = interaction.options.getString('rarity');
 
     const user = await interaction.client.users.fetch(userId);
-    let isInteractionClosed = false; // Bandera para controlar si la interacción fue cerrada
 
     try {
       // Encuentra todas las cartas caídas del usuario
@@ -65,7 +64,7 @@ module.exports = {
       }
       if (grupoFilter) {
         filteredCards = filteredCards.filter(card => card.grupo && cleanString(card.grupo).includes(cleanString(grupoFilter)));
-      }    
+      }
       if (eraFilter) {
         filteredCards = filteredCards.filter(card => card.era && cleanString(card.era).includes(cleanString(eraFilter)));
       }
@@ -74,7 +73,7 @@ module.exports = {
       }
       if (rarityFilter) {
         filteredCards = filteredCards.filter(card => card.rarity && card.rarity.toLowerCase().includes(rarityFilter.toLowerCase()));
-      }      
+      }
 
       if (filteredCards.length === 0) {
         return interaction.editReply({ content: 'No se encontraron cartas en tu inventario que coincidan con los filtros especificados.', ephemeral: true });
@@ -172,12 +171,12 @@ module.exports = {
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
+        // Verifica que la interacción pertenezca al mensaje correcto
+        if (i.message.id !== message.id) return;
+
+        // Verifica que el usuario es el que ejecutó el comando
         if (i.user.id !== interaction.user.id) {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
-        }
-
-        if (isInteractionClosed) {
-          return; // Si la interacción ya fue cerrada, no realizamos ninguna acción
         }
 
         if (i.customId === 'previous' && currentPage > 0) {
@@ -189,7 +188,7 @@ module.exports = {
         } else if (i.customId === 'last') {
           currentPage = totalPages - 1;
         } else if (i.customId === 'close') {
-          isInteractionClosed = true; 
+          await i.update({ content: '**/inventory cerrado...**', embeds: [], components: [] });
           return collector.stop(); // Detener el colector después de cerrar
         }
 
@@ -198,7 +197,7 @@ module.exports = {
       });
 
       collector.on('end', async () => {
-        await message.edit({ content: '**/inventory cerrado...**', embeds: [], components: [] });
+        await message.edit({ components: [] }); // Se eliminan los botones después de que termine la interacción
       });
 
     } catch (error) {
