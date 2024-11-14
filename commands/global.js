@@ -33,61 +33,58 @@ module.exports = {
     const eraFilter = interaction.options.getString('era');
     const eshortFilter = interaction.options.getString('eshort');
     const rarity = interaction.options.getString('rarity');
-    const maxFields = 9;
 
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
-      // Preparar el filtro de la consulta
-      let filter = {};
+      const allDroppedCards = await DroppedCard.find();
+      let filteredCards = allDroppedCards;
+
+      const cleanString = (str) => {
+        return String(str).replace(/[^\w\s]/g, '').toLowerCase(); // Limpiar caracteres especiales
+      };
 
       if (idolFilter) {
-        filter.idol = { $regex: idolFilter, $options: 'i' };  // Filtrar por idol de manera insensible a mayúsculas/minúsculas
+        filteredCards = filteredCards.filter(card => card.idol && card.idol.toLowerCase().includes(idolFilter.toLowerCase()));
       }
       if (grupoFilter) {
-        filter.grupo = { $regex: grupoFilter.replace(/[^\w\s]/g, ''), $options: 'i' };  // Filtrar por grupo, limpiando caracteres especiales
+        filteredCards = filteredCards.filter(card => card.grupo && cleanString(card.grupo).includes(cleanString(grupoFilter)));
       }
       if (eraFilter) {
-        filter.era = { $regex: eraFilter.replace(/[^\w\s]/g, ''), $options: 'i' };  // Filtrar por era
+        filteredCards = filteredCards.filter(card => card.era && cleanString(card.era).includes(cleanString(eraFilter)));
       }
       if (eshortFilter) {
-        filter.eshort = { $regex: eshortFilter, $options: 'i' };  // Filtrar por era corta
+        filteredCards = filteredCards.filter(card => card.eshort && card.eshort.toLowerCase().includes(eshortFilter.toLowerCase()));
       }
       if (rarity) {
-        filter.rarity = rarity;  // Filtrar por rareza
+        filteredCards = filteredCards.filter(card => card.rarity === rarity);
       }
 
-      // Consultar las cartas que coinciden con el filtro
-      const allFilteredCards = await DroppedCard.find(filter);
+      const maxFields = 9;
+      const totalPages = Math.ceil(filteredCards.length / maxFields);
+      let currentPage = 0;
 
-      if (allFilteredCards.length === 0) {
+      if (filteredCards.length === 0) {
         return interaction.editReply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
       }
 
-      // Paginación
-      const totalPages = Math.ceil(allFilteredCards.length / maxFields);
-      let currentPage = 0;
-
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${allFilteredCards.length} cartas encontradas`, iconURL: interaction.user.displayAvatarURL() })
+          .setAuthor({ name: `${filteredCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
         const startIndex = page * maxFields;
-        const endIndex = Math.min(startIndex + maxFields, allFilteredCards.length);
-
-        // Añadir campos a cada página
+        const endIndex = Math.min(startIndex + maxFields, filteredCards.length);
         for (let i = startIndex; i < endIndex; i++) {
-          const card = allFilteredCards[i];
+          const card = filteredCards[i];
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
             value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
             inline: true,
           });
         }
-
         return embed;
       };
 
