@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const Card = require('../models/Card');
 const DroppedCard = require('../models/DroppedCard');
 
@@ -152,13 +152,16 @@ module.exports = {
       await interaction.deferReply();
 
       // Enviar la respuesta inicial
-      await interaction.editReply({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
+      const message = await interaction.editReply({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
 
-      const collector = interaction.channel.createMessageComponentCollector({ time: 60000 });
+      // Configurar el colector de botones
+      const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
+        // Asegurarse de que la interacción sea solo del usuario que ejecutó el comando
         if (i.user.id !== interaction.user.id) return;
 
+        // Navegación de páginas
         if (i.customId === 'first') currentPage = 0;
         if (i.customId === 'prev' && currentPage > 0) currentPage--;
         if (i.customId === 'next' && currentPage < totalPages - 1) currentPage++;
@@ -169,11 +172,15 @@ module.exports = {
           return;
         }
 
-
+        // Actualizar el embed y los botones
+        await i.update({
+          embeds: [createEmbed(currentPage)],
+          components: [createButtons(currentPage)],
+        });
       });
 
       collector.on('end', async () => {
-        await interaction.editReply({ components: [] }); // Deshabilitar los botones cuando termine el tiempo
+        await message.edit({ components: [] }); // Deshabilitar los botones cuando termine el tiempo
       });
 
     } catch (error) {
