@@ -72,13 +72,24 @@ module.exports = {
         return interaction.editReply({ content: 'Debes proporcionar al menos un grupo o un idol.', ephemeral: true });
       }
 
+      const cleanString = (str) => {
+        return String(str).toLowerCase(); // No eliminar caracteres especiales
+      };
+
+      // Función para escapar caracteres especiales en una cadena para una expresión regular
+      const escapeRegExp = (str) => {
+        return str.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'); // Escapa los caracteres especiales
+      };
+
       // Crear consulta para obtener cartas según el grupo o idol
       let query = {};
       if (idol) {
-        query.idol = { $regex: new RegExp(idol, 'i') }; // Si se proporciona idol, buscamos por idol
+        // Escapar el idol para que pueda ser usado en una expresión regular
+        query.idol = { $regex: new RegExp(escapeRegExp(idol), 'i') }; // Si se proporciona idol, buscamos por idol
       }
       if (grupo) {
-        query.grupo = { $regex: new RegExp(grupo, 'i') }; // Si se proporciona grupo, buscamos por grupo
+        // Escapar el grupo para que pueda ser usado en una expresión regular
+        query.grupo = { $regex: new RegExp(escapeRegExp(grupo), 'i') }; // Si se proporciona grupo, buscamos por grupo
       }
 
       // Obtener todas las cartas disponibles que coinciden con el grupo o idol
