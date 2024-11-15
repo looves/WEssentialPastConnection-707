@@ -8,39 +8,6 @@ const generateCardCode = require('../utils/generateCardCode');
 const incrementCardCount = require('../utils/incrementCardCount');
 const getImageExtension = require('../utils/getImageExtension');
 
-// Probabilidades de rareza (porcentaje total debe sumar 100)
-const rarityProbabilities = {
-  1: 70, // Común
-  2: 27, // Poco común
-  3: 3   // Raro
-};
-
-// Función para obtener una rareza aleatoria basada en las probabilidades
-function getRandomRarity(probabilities) {
-  const random = Math.random() * 100;
-  let cumulativeProbability = 0;
-
-  for (const [rarity, probability] of Object.entries(probabilities)) {
-    cumulativeProbability += probability;
-    if (random < cumulativeProbability) {
-      return rarity; // Devuelve la rareza seleccionada (1, 2, 3)
-    }
-  }
-}
-
-// Función para seleccionar una carta con base en la rareza seleccionada
-async function selectCardWithProbability(cards) {
-  const selectedRarity = getRandomRarity(rarityProbabilities);
-
-  // Filtra las cartas por rareza
-  const filteredCards = cards.filter(card => card.rarity == selectedRarity);
-
-  // Si hay cartas de la rareza seleccionada, elige una aleatoria, si no, elige una carta cualquiera
-  return filteredCards.length > 0
-    ? filteredCards[Math.floor(Math.random() * filteredCards.length)]
-    : cards[Math.floor(Math.random() * cards.length)];
-}
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('daily')
@@ -74,11 +41,19 @@ module.exports = {
         });
       }
 
-      // Obtener todas las cartas
-      const cards = await Card.find();
+      // Obtener todas las cartas con rareza 2
+      const cards = await Card.find({ rarity: 2 });
 
-      // Selecciona una carta aleatoria según las probabilidades
-      const selectedCard = await selectCardWithProbability(cards);
+      // Si no hay cartas con rareza 2
+      if (cards.length === 0) {
+        return interaction.followUp({
+          content: 'No hay cartas con rareza 2 disponibles.',
+          ephemeral: true,
+        });
+      }
+
+      // Selecciona una carta aleatoria entre las cartas con rareza 2
+      const selectedCard = cards[Math.floor(Math.random() * cards.length)];
 
       // Generar un código único para la carta obtenida
       const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity));
