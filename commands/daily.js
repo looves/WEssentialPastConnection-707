@@ -7,6 +7,7 @@ const updateInventory = require('../utils/updateInventory');
 const generateCardCode = require('../utils/generateCardCode');
 const incrementCardCount = require('../utils/incrementCardCount');
 const getImageExtension = require('../utils/getImageExtension');
+const checkBan = require('../utils/checkBan'); // Importamos el utilitario checkBan
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -18,6 +19,15 @@ module.exports = {
       await interaction.deferReply(); // Indicar que estamos trabajando en la respuesta
 
       const userId = interaction.user.id;
+
+      // Verificar si el usuario está baneado
+      const isBanned = await checkBan(userId);
+      if (isBanned) {
+        return interaction.followUp({
+          content: 'Estás baneado y no puedes reclamar la recompensa diaria.',
+          ephemeral: true,
+        });
+      }
 
       // Crear o actualizar el usuario sin esperar
       await User.findOneAndUpdate(
