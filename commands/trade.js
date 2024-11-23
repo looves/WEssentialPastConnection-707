@@ -18,9 +18,7 @@ module.exports = {
     .addStringOption(option =>
       option.setName('request')
         .setDescription('Los códigos de las cartas que deseas recibir, separados por espacios.')
-        .setRequired(true))
-    .setIntegrationTypes([0, 1])
-    .setContexts([0, 1, 2]),
+        .setRequired(true)),
     
   async execute(interaction) {
     const usuario = interaction.options.getUser('user');
