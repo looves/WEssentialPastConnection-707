@@ -1,10 +1,77 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const DroppedCard = require('../models/DroppedCard');
-const Card = require('../models/Card');
-const User = require('../models/User');
 const rarityToEmojis = require('../utils/rarityToEmojis');
-const transactionGuard = require('../utils/transactionGuard');
-const checkBan = require('../utils/checkBan');
+const User = require('../models/User');
+const axios = require('axios');
+const sharp = require('sharp');
+
+// Función para descargar y redimensionar imágenes con texto de CopyNumber
+async function fetchImagesWithCopyNumber(cardData) {
+  const cardWidth = 1080; // Ancho fijo
+  const cardHeight = 1669; // Alto fijo
+
+  const imageBuffers = [];
+  const urlCache = new Set(); // Usamos un Set para evitar duplicados
+
+  for (const { url, copyNumber } of cardData) {
+    const uniqueKey = `${url}-${copyNumber}`;
+    if (!urlCache.has(uniqueKey)) {
+      const response = await axios.get(url, { responseType: 'arraybuffer' });
+
+      const svgText = `<svg width="${cardWidth}" height="${cardHeight}">
+                        <text x="50%" y="${cardHeight - 20}" font-size="90" font-weight="bold" text-anchor="middle" fill="white" font-family="Impact">
+                          #${copyNumber}
+                        </text>
+                      </svg>`;
+
+      const imageBuffer = await sharp(response.data)
+        .resize(cardWidth, cardHeight)
+        .composite([{ input: Buffer.from(svgText), gravity: 'south' }])
+        .toBuffer();
+
+      urlCache.add(uniqueKey);
+      imageBuffers.push(imageBuffer);
+    }
+  }
+
+  return imageBuffers;
+}
+
+// Función para combinar imágenes en una cuadrícula 3x3
+async function combineCardImagesWithCopyNumber(cardData) {
+  try {
+    const cardCount = cardData.length;
+    if (cardCount === 0) throw new Error('No hay imágenes para combinar.');
+
+    const rows = Math.ceil(cardCount / 3);
+    const cols = Math.min(cardCount, 3);
+
+    const cardWidth = 1080;
+    const cardHeight = 1669;
+
+    const imageBuffers = await fetchImagesWithCopyNumber(cardData);
+
+    const combinedImage = sharp({
+      create: {
+        width: cardWidth * cols,
+        height: cardHeight * rows,
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 0 },
+      },
+    })
+      .composite(imageBuffers.map((buffer, index) => ({
+        input: buffer,
+        top: Math.floor(index / cols) * cardHeight,
+        left: (index % cols) * cardWidth,
+      })))
+      .png();
+
+    return await combinedImage.toBuffer();
+  } catch (error) {
+    console.error('Error al combinar las imágenes:', error);
+    throw new Error('No se pudo combinar las imágenes.');
+  }
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,57 +83,41 @@ module.exports = {
         .setRequired(true))
     .addStringOption(option =>
       option.setName('card')
-        .setDescription('El código de la carta que deseas transferir.')
+        .setDescription('Los códigos de las cartas que deseas transferir (separados por espacios).')
         .setRequired(false))
     .addIntegerOption(option =>
       option.setName('coins')
         .setDescription('La cantidad de dinero que deseas transferir.')
-        .setRequired(false)),
+        .setRequired(false))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const usuario = interaction.options.getUser('user');
-    const codigo = interaction.options.getString('card');
+    const codigos = interaction.options.getString('card');
     const dinero = interaction.options.getInteger('coins');
     const usuarioIniciador = interaction.user;
-
-    // Verificación de baneo del usuario iniciador
-    if (await checkBan(usuarioIniciador.id)) {
-      return interaction.reply({ content: `No puedes usar \`/transfer\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`, ephemeral: true });
-    }
-
-    // Verificación de baneo del usuario receptor
-    if (await checkBan(usuario.id)) {
-      return interaction.reply({ content: `El usuario **${usuario.username}** está baneado y no puede recibir transferencias.`, ephemeral: true });
-    }
-    
-    if (usuario.id === usuarioIniciador.id) {
-      return interaction.reply({ content: 'No puedes transferir cartas o dinero a ti mismo.', ephemeral: true });
-    }
 
     try {
       const sender = await User.findOne({ userId: usuarioIniciador.id });
       const recipient = await User.findOne({ userId: usuario.id });
 
-      if (!sender) {
-        return interaction.reply({ content: 'No se encontró tu perfil en la base de datos. Por favor, configura tu perfil primero.', ephemeral: true });
+      if (!sender || !recipient) {
+        return interaction.reply({ content: 'Uno de los usuarios no tiene un perfil registrado.', ephemeral: true });
       }
 
-      if (!recipient) {
-        return interaction.reply({ content: 'El usuario al que intentas transferir no tiene un perfil en el sistema.', ephemeral: true });
-      }
-
-      // Verificar y procesar la transferencia de dinero
+      // Transferencia de dinero
       if (dinero) {
         if (sender.coins < dinero) {
-          return interaction.reply({ content: 'No tienes suficiente dinero para realizar esta transferencia.', ephemeral: true });
+          return interaction.reply({ content: 'No tienes suficientes monedas para realizar esta transferencia.', ephemeral: true });
         }
 
         const embedDinero = new EmbedBuilder()
-          .setTitle('Transferencia de Dinero')
+          .setTitle('Transferencia de Monedas')
           .setColor('#60a5fa')
-          .setDescription(`<:dot:1291582825232994305>Estás a punto de transferir ${dinero} :coin: coins a ${usuario.username}.`);
+          .setDescription(`<:dot:1291582825232994305>Estás a punto de transferir **${dinero}** coins a **${usuario.username}**.`);
 
-        const row = new ActionRowBuilder()
+        const rowDinero = new ActionRowBuilder()
           .addComponents(
             new ButtonBuilder()
               .setCustomId('accept_transfer_money')
@@ -76,125 +127,132 @@ module.exports = {
             new ButtonBuilder()
               .setCustomId('cancel_transfer_money')
               .setLabel('Rechazar')
-              .setEmoji("<:close:1290467856437481574>")
+             .setEmoji("<:close:1290467856437481574>")
               .setStyle(ButtonStyle.Danger)
           );
 
-        await interaction.reply({ embeds: [embedDinero], components: [row] });
+        await interaction.reply({ embeds: [embedDinero], components: [rowDinero] });
 
-        const filter = i => (i.customId === 'accept_transfer_money' || i.customId === 'cancel_transfer_money') && i.user.id === usuarioIniciador.id;
+        const filter = i => i.user.id === usuarioIniciador.id;
         const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
 
         collector.on('collect', async i => {
           if (i.customId === 'accept_transfer_money') {
-            await transactionGuard(
-              async () => {
-                sender.coins -= dinero;
-                recipient.coins = (recipient.coins || 0) + dinero;
-                await sender.save();
-                await recipient.save();
+            sender.coins -= dinero;
+            recipient.coins = (recipient.coins || 0) + dinero;
 
-                await interaction.editReply({ content: `_ _¡Transferencia de dinero completada con éxito!_ _||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|||||||||||| ${usuario}`, embeds: [], components: [] });
-              },
-              async () => {
-                sender.coins += dinero;
-                await sender.save();
-              },
-              interaction
-            );
-            collector.stop();
+            await sender.save();
+            await recipient.save();
+
+            await interaction.editReply({ content: `_ _¡Transferencia de **${dinero}** monedas completada!_ _||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|||||||||||| ${usuario}`, embeds: [], components: [] });
           } else if (i.customId === 'cancel_transfer_money') {
-            await interaction.reply({ content: 'La transferencia de dinero ha sido cancelada.', embeds: [], components: [] });
-            collector.stop();
+            await interaction.editReply({ content: 'Transferencia de monedas cancelada.', embeds: [], components: [] });
           }
+          collector.stop();
         });
 
         collector.on('end', collected => {
           if (!collected.size) {
-            interaction.reply({ content: 'El tiempo para aceptar la transferencia de dinero ha expirado.', embeds: [], components: [] });
+            interaction.editReply({ content: 'El tiempo para aceptar la transferencia de monedas expiró.', embeds: [], components: [] });
           }
         });
-
-        return;
       }
 
-      // Verificar y procesar la transferencia de carta
-      if (codigo) {
-        const cartaDroppada = await DroppedCard.findOne({ userId: usuarioIniciador.id, uniqueCode: codigo }).populate('cardId');
+      // Transferencia de cartas
+      if (codigos) {
+        const codigosArray = codigos.split(/\s+/).filter(codigo => codigo.trim() !== '');
 
-        if (!cartaDroppada) {
-          return interaction.reply({ content: `No posees la carta que intentas transferir.\n-# Solo puedes transferir una carta a la vez. (posible error)`, ephemeral: true });
+        if (codigosArray.length > 3) {
+          return interaction.reply({ content: 'Solo puedes transferir hasta 3 cartas a la vez.', ephemeral: true });
         }
 
-        const cartaOriginal = cartaDroppada.cardId;
+        const cartasDroppadas = await DroppedCard.find({ userId: usuarioIniciador.id, uniqueCode: { $in: codigosArray } })
+          .populate('cardId');
 
-        if (!cartaOriginal) {
-          return interaction.reply({ content: 'No se pudo encontrar la información de la carta en la base de datos.', ephemeral: true });
+        const cartasNoEncontradas = codigosArray.filter(codigo => !cartasDroppadas.some(carta => carta.uniqueCode === codigo));
+        if (cartasNoEncontradas.length > 0) {
+          return interaction.reply({ content: `No se encontraron cartas con los códigos: ${cartasNoEncontradas.join(' ')}.`, ephemeral: true });
         }
 
-        const embedCarta = new EmbedBuilder()
-          .setTitle('Transferencia de Carta')
+        const cardData = cartasDroppadas.map(carta => ({
+          url: carta.cardId.image,
+          copyNumber: carta.copyNumber,
+        }));
+
+        const embedCartas = new EmbedBuilder()
+          .setTitle('Transferencia de Cartas')
           .setColor('#60a5fa')
-          .setDescription(`Estás a punto de transferir a __**${usuario.username}**__ la carta:`)
-          .addFields({ name: `${cartaOriginal.idol}<:dot:1291582825232994305>\`#${cartaDroppada.copyNumber}\``, value: `${rarityToEmojis(cartaDroppada.rarity)} ${cartaOriginal.grupo} ${cartaOriginal.eshort}\n\`\`\`${cartaDroppada.uniqueCode}\`\`\`` });
+          .setDescription(`Estás a punto de transferir a **${usuario.username}**:`);
 
-        const row = new ActionRowBuilder()
+        cartasDroppadas.forEach(carta => {
+          const card = carta.cardId;
+          embedCartas.addFields({
+            name: `${card.idol}<:dot:1291582825232994305> \`#${carta.copyNumber}\``,
+            value: `${rarityToEmojis(carta.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${carta.uniqueCode}\`\`\``
+          });
+        });
+
+        const combinedImageBuffer = await combineCardImagesWithCopyNumber(cardData);
+
+        const rowCartas = new ActionRowBuilder()
           .addComponents(
             new ButtonBuilder()
-              .setCustomId('accept_transfer_card')
-            .setEmoji("<:check:1298398838570356767>")
+              .setCustomId('accept_transfer_cards')
               .setLabel('Aceptar')
+              .setEmoji("<:check:1298398838570356767>")
               .setStyle(ButtonStyle.Success),
             new ButtonBuilder()
-              .setCustomId('cancel_transfer_card')
-              .setEmoji("<:close:1290467856437481574>")
+              .setCustomId('cancel_transfer_cards')
               .setLabel('Rechazar')
+              .setEmoji("<:close:1290467856437481574>")
               .setStyle(ButtonStyle.Danger)
           );
 
-        await interaction.reply({ embeds: [embedCarta], components: [row] });
-
-        const filter = i => (i.customId === 'accept_transfer_card' || i.customId === 'cancel_transfer_card') && i.user.id === usuarioIniciador.id;
-        const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
-
-        collector.on('collect', async i => {
-          if (i.customId === 'accept_transfer_card') {
-            await transactionGuard(
-              async () => {
-                cartaDroppada.userId = usuario.id;
-                await cartaDroppada.save();
-
-                const embedTransferida = new EmbedBuilder()
-                  .setTitle('Transferencia exitosa!')
-                  .setColor('#60a5fa')
-                  .setDescription(`\`${cartaOriginal.idol}\` de **${cartaOriginal.grupo}** ${cartaOriginal.eshort} <:dot:1291582825232994305>\`#${cartaDroppada.copyNumber}\`\n\`\`\`${cartaDroppada.uniqueCode}\`\`\``)
-                  .setImage(cartaOriginal.image);
-
-                await interaction.editReply({ content: `Carta transferida a ${usuario}`, embeds: [embedTransferida], components: [] });
-              },
-              async () => {
-                cartaDroppada.userId = usuarioIniciador.id;
-                await cartaDroppada.save();
-              },
-              interaction
-            );
-            collector.stop();
-          } else if (i.customId === 'cancel_transfer_card') {
-            await interaction.editReply({ content: 'La transferencia de la carta ha sido cancelada.', embeds: [], components: [] });
-            collector.stop();
-          }
+        await interaction.reply({
+          embeds: [embedCartas],
+          components: [rowCartas]
         });
 
-        collector.on('end', collected => {
+        const filterCartas = i => i.user.id === usuarioIniciador.id;
+        const collectorCartas = interaction.channel.createMessageComponentCollector({ filter: filterCartas, time: 60000 });
+
+            collectorCartas.on('collect', async i => {
+              if (i.customId === 'accept_transfer_cards') {
+                for (const carta of cartasDroppadas) {
+                  carta.userId = usuario.id;
+                  await carta.save();
+                }
+
+                // Embed de confirmación de transferencia exitosa
+                const embedTransferida = new EmbedBuilder()
+                  .setTitle('Transferencia Exitosa!')
+                  .setColor('#60a5fa')
+                  .setDescription(`Las siguientes cartas han sido transferidas a **${usuario.username}**:`);
+                embedTransferida.setImage('attachment://transfer_cards.png');
+
+                // Editar la respuesta con el embed y la imagen dentro
+                await interaction.editReply({
+                  content: `Carta transferida a ${usuario}`,
+                  embeds: [embedTransferida],
+                  components: [],
+                  files: [{ attachment: combinedImageBuffer, name: 'transfer_cards.png' }]
+                });
+              } else if (i.customId === 'cancel_transfer_cards') {
+                await interaction.editReply({ content: 'Transferencia de cartas cancelada.', embeds: [], components: [] });
+              }
+              collectorCartas.stop();
+            });
+
+        collectorCartas.on('end', collected => {
           if (!collected.size) {
-            interaction.editReply({ content: 'El tiempo para aceptar la transferencia de la carta ha expirado.', embeds: [], components: [] });
+            interaction.editReply({ content: 'El tiempo para aceptar la transferencia de cartas expiró.', embeds: [], components: [] });
           }
         });
       }
 
     } catch (error) {
-      console.error('Error en la ejecución del comando /transfer:', error);
-      interaction.reply({ content: 'Ocurrió un error al intentar transferir. Inténtalo de nuevo más tarde.', ephemeral: true });
+      console.error(error);
+      interaction.reply({ content: 'Hubo un error al procesar la transferencia.', ephemeral: true });
     }
-  }
+  },
 };
