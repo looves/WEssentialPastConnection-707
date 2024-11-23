@@ -18,7 +18,10 @@ module.exports = {
     .addStringOption(option =>
       option.setName('request')
         .setDescription('Los códigos de las cartas que deseas recibir, separados por espacios.')
-        .setRequired(true)),
+        .setRequired(true))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
+    
   async execute(interaction) {
     const usuario = interaction.options.getUser('user');
     const ofertaCodes = interaction.options.getString('offer').split(' ').map(code => code.trim());
@@ -39,9 +42,9 @@ module.exports = {
       return interaction.reply({ content: 'No puedes intercambiar cartas contigo mismo.', ephemeral: true });
     }
 
-    // Limitar el número de cartas ofrecidas y solicitadas a 2
-    if (ofertaCodes.length > 2 || pedirCodes.length > 2) {
-      return interaction.reply({ content: 'Puedes intercambiar hasta 2 cartas a la vez.', ephemeral: true });
+    // Limitar el número de cartas ofrecidas y solicitadas a 4
+    if (ofertaCodes.length > 4 || pedirCodes.length > 4) {
+      return interaction.reply({ content: 'Puedes intercambiar hasta 4 cartas a la vez.', ephemeral: true });
     }
 
     try {
