@@ -9,7 +9,7 @@ const incrementCardCount = require('../utils/incrementCardCount'); // Util para 
 const rarityToEmojis = require('../utils/rarityToEmojis'); // Para obtener los emojis de rareza
 
 // Definir el ID del bot
-const BOT_ID = '1274129348013719593';
+const BOT_ID = '1273625876961165402';
 const FIELDS_PER_PAGE = 4;
 
 module.exports = {
@@ -29,9 +29,7 @@ module.exports = {
             .setDescription('Códigos de las cartas que quieres combinar (máximo 10).')
             .setRequired(true)
             .setAutocomplete(false)
-        ))
-    .setIntegrationTypes([0, 1])
-    .setContexts([0, 1, 2]),
+        )),
 
   async execute(interaction) {
 
