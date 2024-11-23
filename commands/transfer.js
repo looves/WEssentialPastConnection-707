@@ -88,9 +88,7 @@ module.exports = {
     .addIntegerOption(option =>
       option.setName('coins')
         .setDescription('La cantidad de dinero que deseas transferir.')
-        .setRequired(false))
-    .setIntegrationTypes([0, 1])
-    .setContexts([0, 1, 2]),
+        .setRequired(false)),
 
   async execute(interaction) {
     const usuario = interaction.options.getUser('user');
