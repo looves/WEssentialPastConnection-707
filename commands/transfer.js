@@ -96,18 +96,21 @@ module.exports = {
     const dinero = interaction.options.getInteger('coins');
     const usuarioIniciador = interaction.user;
 
+    // Responde de forma diferida para que no haya timeout
+    await interaction.deferReply();
+
     try {
       const sender = await User.findOne({ userId: usuarioIniciador.id });
       const recipient = await User.findOne({ userId: usuario.id });
 
       if (!sender || !recipient) {
-        return interaction.reply({ content: 'Uno de los usuarios no tiene un perfil registrado.', ephemeral: true });
+        return interaction.editReply({ content: 'Uno de los usuarios no tiene un perfil registrado.', ephemeral: true });
       }
 
       // Transferencia de dinero
       if (dinero) {
         if (sender.coins < dinero) {
-          return interaction.reply({ content: 'No tienes suficientes monedas para realizar esta transferencia.', ephemeral: true });
+          return interaction.editReply({ content: 'No tienes suficientes monedas para realizar esta transferencia.', ephemeral: true });
         }
 
         const embedDinero = new EmbedBuilder()
@@ -125,11 +128,11 @@ module.exports = {
             new ButtonBuilder()
               .setCustomId('cancel_transfer_money')
               .setLabel('Rechazar')
-             .setEmoji("<:close:1290467856437481574>")
+              .setEmoji("<:close:1290467856437481574>")
               .setStyle(ButtonStyle.Danger)
           );
 
-        await interaction.reply({ embeds: [embedDinero], components: [rowDinero] });
+        await interaction.editReply({ embeds: [embedDinero], components: [rowDinero] });
 
         const filter = i => i.user.id === usuarioIniciador.id;
         const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
@@ -142,7 +145,7 @@ module.exports = {
             await sender.save();
             await recipient.save();
 
-            await interaction.editReply({ content: `_ _¡Transferencia de **${dinero}** monedas completada!_ _||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​||||​|||||||||||| ${usuario}`, embeds: [], components: [] });
+            await interaction.editReply({ content: `_ _¡Transferencia de **${dinero}** monedas completada!_ _` });
           } else if (i.customId === 'cancel_transfer_money') {
             await interaction.editReply({ content: 'Transferencia de monedas cancelada.', embeds: [], components: [] });
           }
@@ -161,7 +164,7 @@ module.exports = {
         const codigosArray = codigos.split(/\s+/).filter(codigo => codigo.trim() !== '');
 
         if (codigosArray.length > 3) {
-          return interaction.reply({ content: 'Solo puedes transferir hasta 3 cartas a la vez.', ephemeral: true });
+          return interaction.editReply({ content: 'Solo puedes transferir hasta 3 cartas a la vez.', ephemeral: true });
         }
 
         const cartasDroppadas = await DroppedCard.find({ userId: usuarioIniciador.id, uniqueCode: { $in: codigosArray } })
@@ -169,7 +172,7 @@ module.exports = {
 
         const cartasNoEncontradas = codigosArray.filter(codigo => !cartasDroppadas.some(carta => carta.uniqueCode === codigo));
         if (cartasNoEncontradas.length > 0) {
-          return interaction.reply({ content: `No se encontraron cartas con los códigos: ${cartasNoEncontradas.join(' ')}.`, ephemeral: true });
+          return interaction.editReply({ content: `No se encontraron cartas con los códigos: ${cartasNoEncontradas.join(' ')}.`, ephemeral: true });
         }
 
         const cardData = cartasDroppadas.map(carta => ({
@@ -206,7 +209,7 @@ module.exports = {
               .setStyle(ButtonStyle.Danger)
           );
 
-        await interaction.reply({
+        await interaction.editReply({
           embeds: [embedCartas],
           components: [rowCartas]
         });
@@ -214,32 +217,32 @@ module.exports = {
         const filterCartas = i => i.user.id === usuarioIniciador.id;
         const collectorCartas = interaction.channel.createMessageComponentCollector({ filter: filterCartas, time: 60000 });
 
-            collectorCartas.on('collect', async i => {
-              if (i.customId === 'accept_transfer_cards') {
-                for (const carta of cartasDroppadas) {
-                  carta.userId = usuario.id;
-                  await carta.save();
-                }
+        collectorCartas.on('collect', async i => {
+          if (i.customId === 'accept_transfer_cards') {
+            for (const carta of cartasDroppadas) {
+              carta.userId = usuario.id;
+              await carta.save();
+            }
 
-                // Embed de confirmación de transferencia exitosa
-                const embedTransferida = new EmbedBuilder()
-                  .setTitle('Transferencia Exitosa!')
-                  .setColor('#60a5fa')
-                  .setDescription(`Las siguientes cartas han sido transferidas a **${usuario.username}**:`);
-                embedTransferida.setImage('attachment://transfer_cards.png');
+            // Embed de confirmación de transferencia exitosa
+            const embedTransferida = new EmbedBuilder()
+              .setTitle('Transferencia Exitosa!')
+              .setColor('#60a5fa')
+              .setDescription(`Las siguientes cartas han sido transferidas a **${usuario.username}**:`);
+            embedTransferida.setImage('attachment://transfer_cards.png');
 
-                // Editar la respuesta con el embed y la imagen dentro
-                await interaction.editReply({
-                  content: `Carta transferida a ${usuario}`,
-                  embeds: [embedTransferida],
-                  components: [],
-                  files: [{ attachment: combinedImageBuffer, name: 'transfer_cards.png' }]
-                });
-              } else if (i.customId === 'cancel_transfer_cards') {
-                await interaction.editReply({ content: 'Transferencia de cartas cancelada.', embeds: [], components: [] });
-              }
-              collectorCartas.stop();
+            // Editar la respuesta con el embed y la imagen dentro
+            await interaction.editReply({
+              content: `Carta transferida a ${usuario}`,
+              embeds: [embedTransferida],
+              components: [],
+              files: [{ attachment: combinedImageBuffer, name: 'transfer_cards.png' }]
             });
+          } else if (i.customId === 'cancel_transfer_cards') {
+            await interaction.editReply({ content: 'Transferencia de cartas cancelada.', embeds: [], components: [] });
+          }
+          collectorCartas.stop();
+        });
 
         collectorCartas.on('end', collected => {
           if (!collected.size) {
@@ -250,7 +253,7 @@ module.exports = {
 
     } catch (error) {
       console.error(error);
-      interaction.reply({ content: 'Hubo un error al procesar la transferencia.', ephemeral: true });
+      interaction.editReply({ content: 'Hubo un error al procesar la transferencia.', ephemeral: true });
     }
   },
 };
