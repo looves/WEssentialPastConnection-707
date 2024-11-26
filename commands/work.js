@@ -31,13 +31,13 @@ module.exports = {
           const remainingTime = cooldownTime - timeElapsed;
           const minutes = Math.floor(remainingTime / 60000);
           const seconds = Math.floor((remainingTime % 60000) / 1000);
-          return interaction.reply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando \`/work\` nuevamente!`);
+          return interaction.reply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando </work:1291579000325406797> nuevamente!`);
         }
       }
 
       // Verifica si el usuario tiene una carta favorita definida
       if (!user.favoriteCard) {
-        return interaction.reply({ content: `No puedes usar el comando \`/work\` sin una carta favorita definida. Establece una carta favorita primero.`, ephemeral: true });
+        return interaction.reply({ content: `No puedes usar el comando </work:1291579000325406797> sin una carta favorita definida. Establece una carta favorita primero.`, ephemeral: true });
       }
 
       // Busca la carta favorita del usuario usando el valor de favoriteCard como una cadena
@@ -89,7 +89,7 @@ module.exports = {
 
       // Configura la notificación para cuando el cooldown haya pasado
       setTimeout(() => {
-        interaction.channel.send(`<@${userId}>, el comando \`/work\` ya está disponible nuevamente!`).catch(console.error);
+        interaction.channel.send(`<@${userId}>, el comando </work:1291579000325406797> ya está disponible nuevamente!`).catch(console.error);
       }, cooldownTime);
 
     } catch (error) {
