@@ -24,7 +24,7 @@ module.exports = {
       const isBanned = await checkBan(userId);
       if (isBanned) {
         return interaction.followUp({
-          content: 'Estás baneado y no puedes reclamar la recompensa diaria.',
+          content: `Estás baneado y no puedes usar </daily:1305655606627139644>`,
           ephemeral: true,
         });
       }
