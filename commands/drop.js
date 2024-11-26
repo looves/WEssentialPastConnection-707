@@ -45,7 +45,7 @@ module.exports = {
 
            // Llamada a checkBan para verificar si el usuario está baneado
             if (await checkBan(userId)) {
-                return interaction.editReply(`No puedes usar el comando \`/drop\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
+                return interaction.editReply(`No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
             }
         
         // Determinar el cooldown basado en el rol
@@ -68,7 +68,7 @@ module.exports = {
                 const remainingTime = cooldownTime - timeElapsed;
                 const minutes = Math.floor(remainingTime / 60000);
                 const seconds = Math.floor((remainingTime % 60000) / 1000);
-                return interaction.editReply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando \`/drop\` nuevamente!`);
+                return interaction.editReply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando </drop:1291579000044650509> nuevamente!`);
             }
         }
 
@@ -136,7 +136,7 @@ module.exports = {
 
             // Mensaje para el cooldown
             setTimeout(() => {
-                interaction.channel.send(`<@${userId}>, el comando \`/drop\` ya está disponible nuevamente!`).catch(console.error);
+                interaction.channel.send(`<@${userId}>, el comando </drop:1291579000044650509> ya está disponible nuevamente!`).catch(console.error);
             }, cooldownTime);
 
         } catch (error) {
