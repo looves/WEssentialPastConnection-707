@@ -37,48 +37,43 @@ module.exports = {
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
-      const allDroppedCards = await DroppedCard.find();
-      let filteredCards = allDroppedCards;
+      // Crea un objeto de filtros que solo contiene las opciones que no son nulas
+      const filters = {};
+      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' }; // Usamos expresiones regulares para ignorar mayúsculas/minúsculas
+      if (grupoFilter) filters.grupo = { $regex: grupoFilter, $options: 'i' };
+      if (eraFilter) filters.era = { $regex: eraFilter, $options: 'i' };
+      if (eshortFilter) filters.eshort = { $regex: eshortFilter, $options: 'i' };
+      if (rarity) filters.rarity = rarity;
 
-      const cleanString = (str) => {
-        return String(str).replace(/[^\w\s]/g, '').toLowerCase(); // Limpiar caracteres especiales
-      };
+      // Obtén el total de cartas que coinciden con los filtros aplicados
+      const totalCards = await DroppedCard.countDocuments(filters);
 
-      if (idolFilter) {
-        filteredCards = filteredCards.filter(card => card.idol && card.idol.toLowerCase().includes(idolFilter.toLowerCase()));
-      }
-      if (grupoFilter) {
-        filteredCards = filteredCards.filter(card => card.grupo && cleanString(card.grupo).includes(cleanString(grupoFilter)));
-      }
-      if (eraFilter) {
-        filteredCards = filteredCards.filter(card => card.era && cleanString(card.era).includes(cleanString(eraFilter)));
-      }
-      if (eshortFilter) {
-        filteredCards = filteredCards.filter(card => card.eshort && card.eshort.toLowerCase().includes(eshortFilter.toLowerCase()));
-      }
-      if (rarity) {
-        filteredCards = filteredCards.filter(card => card.rarity === rarity);
-      }
-
-      const maxFields = 9;
-      const totalPages = Math.ceil(filteredCards.length / maxFields);
-      let currentPage = 0;
-
-      if (filteredCards.length === 0) {
+      if (totalCards === 0) {
         return interaction.editReply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
       }
 
+      // Pagina los resultados
+      const maxFields = 9; // Máximo número de cartas por página
+      const totalPages = Math.ceil(totalCards / maxFields);
+      let currentPage = 0;
+
+      // Realiza la consulta optimizada con los filtros y la paginación
+      const cards = await DroppedCard.find(filters)
+        .lean()  // Utilizamos lean() para obtener solo objetos planos (más rápido)
+        .skip(currentPage * maxFields)  // Salta los elementos de las páginas anteriores
+        .limit(maxFields);  // Limita el número de resultados a los de la página actual
+
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${filteredCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
+          .setAuthor({ name: `${totalCards} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
         const startIndex = page * maxFields;
-        const endIndex = Math.min(startIndex + maxFields, filteredCards.length);
+        const endIndex = Math.min(startIndex + maxFields, cards.length);
         for (let i = startIndex; i < endIndex; i++) {
-          const card = filteredCards[i];
+          const card = cards[i];
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
             value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
@@ -130,10 +125,7 @@ module.exports = {
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
-        // Verifica que la interacción pertenezca al mensaje correcto
-        if (i.message.id !== message.id) return;
-
-        // Verifica que el usuario es el que ejecutó el comando
+        if (i.message.id !== message.id) return;  // Verifica que la interacción pertenezca al mensaje correcto
         if (i.user.id !== interaction.user.id) {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
@@ -153,6 +145,11 @@ module.exports = {
         }
 
         // Actualiza el mensaje con la nueva página
+        const newCards = await DroppedCard.find(filters)
+          .lean()  // Utilizamos lean() para una consulta más rápida
+          .skip(currentPage * maxFields)
+          .limit(maxFields);
+
         await i.update({
           embeds: [createEmbed(currentPage)],
           components: [getButtonRow(currentPage, totalPages)],
