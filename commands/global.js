@@ -39,7 +39,7 @@ module.exports = {
 
       // Crea un objeto de filtros que solo contiene las opciones que no son nulas
       const filters = {};
-      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' };
+      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' }; // Usamos expresiones regulares para ignorar mayúsculas/minúsculas
       if (grupoFilter) filters.grupo = { $regex: grupoFilter, $options: 'i' };
       if (eraFilter) filters.era = { $regex: eraFilter, $options: 'i' };
       if (eshortFilter) filters.eshort = { $regex: eshortFilter, $options: 'i' };
@@ -59,9 +59,10 @@ module.exports = {
 
       // Realiza la consulta optimizada con los filtros y la paginación
       const cards = await DroppedCard.find(filters)
-        .lean()
-        .skip(currentPage * maxFields)
-        .limit(maxFields);
+        .lean()  // Utilizamos lean() para obtener solo objetos planos (más rápido)
+        .select('idol grupo copyNumber rarity uniqueCode userId')  // Seleccionamos solo los campos necesarios
+        .skip(currentPage * maxFields)  // Salta los elementos de las páginas anteriores
+        .limit(maxFields);  // Limita el número de resultados a los de la página actual
 
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
@@ -125,12 +126,11 @@ module.exports = {
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
-        if (i.message.id !== message.id) return;
+        if (i.message.id !== message.id) return;  // Verifica que la interacción pertenezca al mensaje correcto
         if (i.user.id !== interaction.user.id) {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
 
-        // Cambiar la página según el botón presionado
         if (i.customId === 'previous' && currentPage > 0) {
           currentPage--;
         } else if (i.customId === 'next' && currentPage < totalPages - 1) {
@@ -145,13 +145,13 @@ module.exports = {
           return;
         }
 
-        // Realiza la consulta optimizada para la nueva página
+        // Actualiza el mensaje con la nueva página
         const newCards = await DroppedCard.find(filters)
-          .lean()
+          .lean()  // Utilizamos lean() para una consulta más rápida
+          .select('idol grupo copyNumber rarity uniqueCode userId')  // Seleccionamos solo los campos necesarios
           .skip(currentPage * maxFields)
           .limit(maxFields);
 
-        // Actualiza el mensaje con la nueva página y cartas
         await i.update({
           embeds: [createEmbed(currentPage)],
           components: [getButtonRow(currentPage, totalPages)],
