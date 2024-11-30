@@ -148,7 +148,7 @@ module.exports = {
           );
       };
 
-      // Deferir la respuesta para habilitar los botones interactivos
+      // Deferir la respuesta inmediatamente
       await interaction.deferReply();
 
       // Enviar la respuesta inicial
