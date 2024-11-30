@@ -60,7 +60,7 @@ module.exports = {
       // Crear embed para mostrar las cartas
       const createEmbed = async (page) => {
         const cards = await DroppedCard.find(query)  // Aplicar el filtro de búsqueda
-          .select('idol grupo copyNumber rarity uniqueCode userId')  // Seleccionar solo los campos necesarios
+          .select('idol eshort grupo copyNumber rarity uniqueCode userId')  // Seleccionar solo los campos necesarios
           .skip(page * maxFields)  // Omitir los resultados anteriores
           .limit(maxFields)  // Limitar a 9 resultados
           .lean();  // Utilizar lean para mejorar el rendimiento
