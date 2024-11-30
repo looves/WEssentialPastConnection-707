@@ -24,6 +24,9 @@ module.exports = {
     const grupoFilter = interaction.options.getString('grupo');
     const itemsPerPage = 2; // Número de ítems a mostrar por página
 
+    // Deferir la respuesta inmediatamente para evitar que expire la interacción
+    await interaction.deferReply();
+
     try {
       let filter = {};
 
@@ -39,7 +42,7 @@ module.exports = {
       // Buscar las cartas que coinciden con el filtro
       const allCards = await Card.find(filter);
       if (allCards.length === 0) {
-        return interaction.reply(`No se encontraron cartas para el idol ${idolFilter || ''} en el grupo ${grupoFilter || ''}.`);
+        return interaction.editReply(`No se encontraron cartas para el idol ${idolFilter || ''} en el grupo ${grupoFilter || ''}.`);
       }
 
       // Buscar las cartas que el usuario ya tiene
@@ -147,9 +150,6 @@ module.exports = {
               .setDisabled(page === totalPages - 1)
           );
       };
-
-      // Deferir la respuesta inmediatamente
-      await interaction.deferReply();
 
       // Enviar la respuesta inicial
       const message = await interaction.editReply({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
