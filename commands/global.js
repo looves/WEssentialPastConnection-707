@@ -37,44 +37,36 @@ module.exports = {
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
-      // Crea un objeto de filtros que solo contiene las opciones que no son nulas
+      // Filtrar las cartas directamente en la base de datos
       const filters = {};
-      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' }; // Usamos expresiones regulares para ignorar mayúsculas/minúsculas
+      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' };  // Filtro insensible a mayúsculas/minúsculas
       if (grupoFilter) filters.grupo = { $regex: grupoFilter, $options: 'i' };
       if (eraFilter) filters.era = { $regex: eraFilter, $options: 'i' };
       if (eshortFilter) filters.eshort = { $regex: eshortFilter, $options: 'i' };
       if (rarity) filters.rarity = rarity;
 
-      // Obtén el total de cartas que coinciden con los filtros aplicados
-      const totalCards = await DroppedCard.countDocuments(filters);
+      // Obtener solo las cartas que coincidan con los filtros
+      const filteredCards = await DroppedCard.find(filters).lean(); // Usar lean() para evitar la sobrecarga de Mongoose
 
-      if (totalCards === 0) {
+      const maxFields = 9;
+      const totalPages = Math.ceil(filteredCards.length / maxFields);
+      let currentPage = 0;
+
+      if (filteredCards.length === 0) {
         return interaction.editReply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
       }
 
-      // Pagina los resultados
-      const maxFields = 9; // Máximo número de cartas por página
-      const totalPages = Math.ceil(totalCards / maxFields);
-      let currentPage = 0;
-
-      // Realiza la consulta optimizada con los filtros y la paginación
-      const cards = await DroppedCard.find(filters)
-        .lean()  // Utilizamos lean() para obtener solo objetos planos (más rápido)
-        .select('idol grupo copyNumber rarity uniqueCode userId')  // Seleccionamos solo los campos necesarios
-        .skip(currentPage * maxFields)  // Salta los elementos de las páginas anteriores
-        .limit(maxFields);  // Limita el número de resultados a los de la página actual
-
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${totalCards} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
+          .setAuthor({ name: `${filteredCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
         const startIndex = page * maxFields;
-        const endIndex = Math.min(startIndex + maxFields, cards.length);
+        const endIndex = Math.min(startIndex + maxFields, filteredCards.length);
         for (let i = startIndex; i < endIndex; i++) {
-          const card = cards[i];
+          const card = filteredCards[i];
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
             value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
@@ -126,7 +118,10 @@ module.exports = {
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
-        if (i.message.id !== message.id) return;  // Verifica que la interacción pertenezca al mensaje correcto
+        // Verifica que la interacción pertenezca al mensaje correcto
+        if (i.message.id !== message.id) return;
+
+        // Verifica que el usuario es el que ejecutó el comando
         if (i.user.id !== interaction.user.id) {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
@@ -146,12 +141,6 @@ module.exports = {
         }
 
         // Actualiza el mensaje con la nueva página
-        const newCards = await DroppedCard.find(filters)
-          .lean()  // Utilizamos lean() para una consulta más rápida
-          .select('idol grupo copyNumber rarity uniqueCode userId')  // Seleccionamos solo los campos necesarios
-          .skip(currentPage * maxFields)
-          .limit(maxFields);
-
         await i.update({
           embeds: [createEmbed(currentPage)],
           components: [getButtonRow(currentPage, totalPages)],
