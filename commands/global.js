@@ -37,36 +37,37 @@ module.exports = {
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
-      // Filtrar las cartas directamente en la base de datos
+      // Crear objeto de filtros para pasarlo directamente a la base de datos
       const filters = {};
-      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' };  // Filtro insensible a mayúsculas/minúsculas
-      if (grupoFilter) filters.grupo = { $regex: grupoFilter, $options: 'i' };
-      if (eraFilter) filters.era = { $regex: eraFilter, $options: 'i' };
-      if (eshortFilter) filters.eshort = { $regex: eshortFilter, $options: 'i' };
+      if (idolFilter) filters.idol = new RegExp(idolFilter, 'i');  // Usamos expresión regular para búsqueda insensible a mayúsculas
+      if (grupoFilter) filters.grupo = new RegExp(grupoFilter, 'i');
+      if (eraFilter) filters.era = new RegExp(eraFilter, 'i');
+      if (eshortFilter) filters.eshort = new RegExp(eshortFilter, 'i');
       if (rarity) filters.rarity = rarity;
 
-      // Obtener solo las cartas que coincidan con los filtros
-      const filteredCards = await DroppedCard.find(filters).lean(); // Usar lean() para evitar la sobrecarga de Mongoose
+      // Realizamos la consulta con filtros aplicados, usando .lean() para mejorar el rendimiento
+      const allDroppedCards = await DroppedCard.find(filters).lean();  // Filtrado en base de datos y rendimiento mejorado con .lean()
 
-      const maxFields = 9;
-      const totalPages = Math.ceil(filteredCards.length / maxFields);
-      let currentPage = 0;
-
-      if (filteredCards.length === 0) {
+      // Si no se encuentran cartas
+      if (allDroppedCards.length === 0) {
         return interaction.editReply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
       }
 
+      const maxFields = 9;
+      const totalPages = Math.ceil(allDroppedCards.length / maxFields);
+      let currentPage = 0;
+
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${filteredCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
+          .setAuthor({ name: `${allDroppedCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
         const startIndex = page * maxFields;
-        const endIndex = Math.min(startIndex + maxFields, filteredCards.length);
+        const endIndex = Math.min(startIndex + maxFields, allDroppedCards.length);
         for (let i = startIndex; i < endIndex; i++) {
-          const card = filteredCards[i];
+          const card = allDroppedCards[i];
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
             value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
