@@ -45,86 +45,52 @@ module.exports = {
     const user = await interaction.client.users.fetch(userId);
 
     try {
-      // Encuentra todas las cartas caídas del usuario
-      const droppedCards = await DroppedCard.find({ userId });
+      // Paginación: Definir la página y número máximo de cartas por página
+      const maxFields = 9;
+      let currentPage = 0;  // Página inicial
 
-      if (droppedCards.length === 0) {
+
+         const escapeRegex = (text) => {
+  return text.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'); // Escapa los caracteres especiales
+};
+
+      // Filtrar las cartas en la base de datos
+      const query = {};
+      if (idolFilter) query.idol = new RegExp(escapeRegex(idolFilter), 'i');
+      if (grupoFilter) query.grupo = new RegExp(escapeRegex(grupoFilter), 'i');
+      if (eraFilter) query.era = new RegExp(escapeRegex(eraFilter), 'i');
+      if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
+      if (rarity) query.rarity = rarity; 
+
+      // Obtener el total de cartas que coinciden con el filtro
+      const totalCards = await DroppedCard.countDocuments(query);
+
+      if (totalCards === 0) {
         return interaction.editReply('No tienes cartas en tu inventario.'); // Cambiado a editReply
       }
 
-      // Filtrar las cartas según los criterios especificados
-      let filteredCards = droppedCards;
-
-      const cleanString = (str) => {
-        return String(str).replace(/[^\w\s]/g, '').toLowerCase(); // Limpiar caracteres especiales
-      };
-
-      if (idolFilter) {
-        filteredCards = filteredCards.filter(card => card.idol && card.idol.toLowerCase().includes(idolFilter.toLowerCase()));
-      }
-      if (grupoFilter) {
-        filteredCards = filteredCards.filter(card => card.grupo && cleanString(card.grupo).includes(cleanString(grupoFilter)));
-      }
-      if (eraFilter) {
-        filteredCards = filteredCards.filter(card => card.era && cleanString(card.era).includes(cleanString(eraFilter)));
-      }
-      if (eshortFilter) {
-        filteredCards = filteredCards.filter(card => card.eshort && card.eshort.toLowerCase().includes(eshortFilter.toLowerCase()));
-      }
-      if (rarityFilter) {
-        filteredCards = filteredCards.filter(card => card.rarity && card.rarity.toLowerCase().includes(rarityFilter.toLowerCase()));
-      }
-
-      if (filteredCards.length === 0) {
-        return interaction.editReply({ content: 'No se encontraron cartas en tu inventario que coincidan con los filtros especificados.', ephemeral: true });
-      }
-
-      // Crea un mapa para guardar las cartas y sus detalles
-      const cardDetailsMap = {};
-
-      // Agrega los detalles de las cartas desde DroppedCard
-      filteredCards.forEach(droppedCard => {
-        const key = `${droppedCard.idol} (${droppedCard.grupo}) - Código: ${droppedCard.uniqueCode}`;
-        if (!cardDetailsMap[key]) {
-          cardDetailsMap[key] = {
-            idol: droppedCard.idol,
-            grupo: droppedCard.grupo,
-            era: droppedCard.era,
-            eshort: droppedCard.eshort,
-            rarity: droppedCard.rarity,
-            copies: [],
-          };
-        }
-        cardDetailsMap[key].copies.push({
-          copyNumber: droppedCard.copyNumber,
-          uniqueCode: droppedCard.uniqueCode,
-        });
-      });
-
-      // Preparar la paginación basada en el número de cartas filtradas
-      const totalCards = Object.keys(cardDetailsMap).length;
-      const maxFields = 9; // Máximo de campos (fields) por página
       const totalPages = Math.ceil(totalCards / maxFields);
-      let currentPage = 0;
 
-      const generateEmbed = (page) => {
+      // Función para generar el embed de una página
+      const generateEmbed = async (page) => {
+        const skip = page * maxFields;
+        const cards = await DroppedCard.find(query)  // Realizar la consulta con los filtros
+          .select('idol eshort grupo copyNumber rarity uniqueCode') // Seleccionar solo los campos necesarios
+          .skip(skip)  // Omitir las cartas de páginas anteriores
+          .limit(maxFields)  // Limitar a las cartas de la página actual
+          .lean();  // Usar lean para mejorar el rendimiento
+
         const embed = new EmbedBuilder()
           .setAuthor({ name: `${user.username}'s Inventory`, iconURL: user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
-        const start = page * maxFields;
-        const end = start + maxFields;
-        const pageItems = Object.entries(cardDetailsMap).slice(start, end);
-
-        pageItems.forEach(([key, cardDetails]) => {
-          cardDetails.copies.forEach(copy => {
-            embed.addFields({
-              name: `${cardDetails.idol} <:dot:1296707029087555604> \`#${copy.copyNumber}\``,
-              value: `${rarityToEmojis(cardDetails.rarity)} ${cardDetails.grupo} ${cardDetails.eshort}\n\`\`\`${copy.uniqueCode}\`\`\``,
-              inline: true,
-            });
+        cards.forEach(card => {
+          embed.addFields({
+            name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
+            value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``,
+            inline: true,
           });
         });
 
@@ -162,7 +128,7 @@ module.exports = {
 
       // Enviar el primer embed y los botones
       const message = await interaction.editReply({
-        embeds: [generateEmbed(currentPage)], // editReply en lugar de reply
+        embeds: [await generateEmbed(currentPage)], // editReply en lugar de reply
         components: [getButtonRow(currentPage)],
         fetchReply: true
       });
@@ -193,7 +159,7 @@ module.exports = {
         }
 
         // Solo actualizamos si la interacción no fue cerrada
-        await i.update({ embeds: [generateEmbed(currentPage)], components: [getButtonRow(currentPage)] });
+        await i.update({ embeds: [await generateEmbed(currentPage)], components: [getButtonRow(currentPage)] });
       });
 
       collector.on('end', async () => {
