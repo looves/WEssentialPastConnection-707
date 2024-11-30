@@ -37,49 +37,54 @@ module.exports = {
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
-      // Crear objeto de filtros para pasarlo directamente a la base de datos
-      const filters = {};
-      if (idolFilter) filters.idol = new RegExp(idolFilter, 'i');  // Usamos expresión regular para búsqueda insensible a mayúsculas
-      if (grupoFilter) filters.grupo = new RegExp(grupoFilter, 'i');
-      if (eraFilter) filters.era = new RegExp(eraFilter, 'i');
-      if (eshortFilter) filters.eshort = new RegExp(eshortFilter, 'i');
-      if (rarity) filters.rarity = rarity;
+      // Filtrar las cartas en la base de datos
+      const query = {};
+      if (idolFilter) query.idol = new RegExp(idolFilter, 'i');
+      if (grupoFilter) query.grupo = new RegExp(grupoFilter, 'i');
+      if (eraFilter) query.era = new RegExp(eraFilter, 'i');
+      if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
+      if (rarity) query.rarity = rarity;
 
-      // Realizamos la consulta con filtros aplicados, usando .lean() para mejorar el rendimiento
-      const allDroppedCards = await DroppedCard.find(filters).select('idol eshort grupo copyNumber rarity uniqueCode userId').lean();
+      // Total de cartas que coinciden con el filtro
+      const totalCards = await DroppedCard.countDocuments(query);
 
+      // Configuración de la paginación
+      const maxFields = 9;  // Mostrar 9 cartas por página
+      const totalPages = Math.ceil(totalCards / maxFields);
+      let currentPage = 0;  // Página inicial
 
-      // Si no se encuentran cartas
-      if (allDroppedCards.length === 0) {
+      if (totalCards === 0) {
         return interaction.editReply({ content: 'No se encontraron cartas con los criterios especificados.', ephemeral: true });
       }
 
-      const maxFields = 9;
-      const totalPages = Math.ceil(allDroppedCards.length / maxFields);
-      let currentPage = 0;  // Página inicial
+      // Crear embed para mostrar las cartas
+      const createEmbed = async (page) => {
+        const cards = await DroppedCard.find(query)  // Aplicar el filtro de búsqueda
+          .select('idol grupo copyNumber rarity uniqueCode userId')  // Seleccionar solo los campos necesarios
+          .skip(page * maxFields)  // Omitir los resultados anteriores
+          .limit(maxFields)  // Limitar a 9 resultados
+          .lean();  // Utilizar lean para mejorar el rendimiento
 
-      const createEmbed = (page) => {
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${allDroppedCards.length} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
+          .setAuthor({ name: `${totalCards} cartas en total`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
-        const startIndex = page * maxFields;
-        const endIndex = Math.min(startIndex + maxFields, allDroppedCards.length);
-        for (let i = startIndex; i < endIndex; i++) {
-          const card = allDroppedCards[i];
+        cards.forEach(card => {
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
             value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
             inline: true,
           });
-        }
+        });
+
         return embed;
       };
 
+      // Botones de navegación
       const getButtonRow = (currentPage, totalPages) => {
-        const row = new ActionRowBuilder()
+        return new ActionRowBuilder()
           .addComponents(
             new ButtonBuilder()
               .setCustomId('first')
@@ -106,21 +111,19 @@ module.exports = {
               .setStyle(ButtonStyle.Secondary)
               .setDisabled(currentPage >= totalPages - 1)
           );
-
-        return row;
       };
 
-      // Muestra la respuesta inicial con los botones
+      // Mostrar la respuesta inicial con los botones
       const message = await interaction.editReply({
-        embeds: [createEmbed(currentPage)],
+        embeds: [await createEmbed(currentPage)],
         components: [getButtonRow(currentPage, totalPages)],
       });
 
-      // Configura el colector de botones
+      // Configurar el colector de botones
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
-        // Verifica que la interacción pertenezca al mensaje correcto
+        // Verifica que la interacción pertenece al mensaje correcto
         if (i.message.id !== message.id) return;
 
         // Verifica que el usuario es el que ejecutó el comando
@@ -128,7 +131,6 @@ module.exports = {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
 
-        // Lógica de paginación
         if (i.customId === 'previous' && currentPage > 0) {
           currentPage--;
         } else if (i.customId === 'next' && currentPage < totalPages - 1) {
@@ -143,15 +145,15 @@ module.exports = {
           return;
         }
 
-        // Actualiza el mensaje con la nueva página
+        // Actualizar el mensaje con la nueva página
         await i.update({
-          embeds: [createEmbed(currentPage)],
+          embeds: [await createEmbed(currentPage)],
           components: [getButtonRow(currentPage, totalPages)],
         });
       });
 
       collector.on('end', async () => {
-        // Deshabilita los botones después de que termine el tiempo
+        // Deshabilitar los botones después de que termine el tiempo
         await message.edit({ components: [] });
       });
 
