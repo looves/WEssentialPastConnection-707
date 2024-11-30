@@ -46,7 +46,8 @@ module.exports = {
       if (rarity) filters.rarity = rarity;
 
       // Realizamos la consulta con filtros aplicados, usando .lean() para mejorar el rendimiento
-      const allDroppedCards = await DroppedCard.find(filters).lean();  // Filtrado en base de datos y rendimiento mejorado con .lean()
+      const allDroppedCards = await DroppedCard.find(filters).select('idol eshort grupo copyNumber rarity uniqueCode userId').lean();
+
 
       // Si no se encuentran cartas
       if (allDroppedCards.length === 0) {
