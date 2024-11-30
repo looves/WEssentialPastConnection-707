@@ -55,7 +55,7 @@ module.exports = {
 
       const maxFields = 9;
       const totalPages = Math.ceil(allDroppedCards.length / maxFields);
-      let currentPage = 0;
+      let currentPage = 0;  // Página inicial
 
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
@@ -127,6 +127,7 @@ module.exports = {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
 
+        // Lógica de paginación
         if (i.customId === 'previous' && currentPage > 0) {
           currentPage--;
         } else if (i.customId === 'next' && currentPage < totalPages - 1) {
