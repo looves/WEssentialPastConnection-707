@@ -37,15 +37,15 @@ module.exports = {
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
-    const cleanString = (str) => {
-  return String(str).replace(/[^\w\s]/g, '').toLowerCase().trim(); // Limpiar caracteres especiales y quitar espacios al inicio y al final
+    const escapeRegex = (text) => {
+  return text.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'); // Escapa los caracteres especiales
 };
 
       // Filtrar las cartas en la base de datos
       const query = {};
-      if (idolFilter) query.idol = new RegExp(cleanString(idolFilter), 'i');
-      if (grupoFilter) query.grupo = new RegExp(cleanString(grupoFilter), 'i');
-      if (eraFilter) query.era = new RegExp(cleanString(eraFilter), 'i');
+      if (idolFilter) query.idol = new RegExp(escapeRegex(idolFilter), 'i');
+      if (grupoFilter) query.grupo = new RegExp(escapeRegex(grupoFilter), 'i');
+      if (eraFilter) query.era = new RegExp(escapeRegex(eraFilter), 'i');
       if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
       if (rarity) query.rarity = rarity;
 
