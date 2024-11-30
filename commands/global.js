@@ -39,7 +39,7 @@ module.exports = {
 
       // Crea un objeto de filtros que solo contiene las opciones que no son nulas
       const filters = {};
-      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' }; // Usamos expresiones regulares para ignorar mayúsculas/minúsculas
+      if (idolFilter) filters.idol = { $regex: idolFilter, $options: 'i' };
       if (grupoFilter) filters.grupo = { $regex: grupoFilter, $options: 'i' };
       if (eraFilter) filters.era = { $regex: eraFilter, $options: 'i' };
       if (eshortFilter) filters.eshort = { $regex: eshortFilter, $options: 'i' };
@@ -59,9 +59,9 @@ module.exports = {
 
       // Realiza la consulta optimizada con los filtros y la paginación
       const cards = await DroppedCard.find(filters)
-        .lean()  // Utilizamos lean() para obtener solo objetos planos (más rápido)
-        .skip(currentPage * maxFields)  // Salta los elementos de las páginas anteriores
-        .limit(maxFields);  // Limita el número de resultados a los de la página actual
+        .lean()
+        .skip(currentPage * maxFields)
+        .limit(maxFields);
 
       const createEmbed = (page) => {
         const embed = new EmbedBuilder()
@@ -125,11 +125,12 @@ module.exports = {
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
-        if (i.message.id !== message.id) return;  // Verifica que la interacción pertenezca al mensaje correcto
+        if (i.message.id !== message.id) return;
         if (i.user.id !== interaction.user.id) {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
 
+        // Cambiar la página según el botón presionado
         if (i.customId === 'previous' && currentPage > 0) {
           currentPage--;
         } else if (i.customId === 'next' && currentPage < totalPages - 1) {
@@ -144,12 +145,13 @@ module.exports = {
           return;
         }
 
-        // Actualiza el mensaje con la nueva página
+        // Realiza la consulta optimizada para la nueva página
         const newCards = await DroppedCard.find(filters)
-          .lean()  // Utilizamos lean() para una consulta más rápida
+          .lean()
           .skip(currentPage * maxFields)
           .limit(maxFields);
 
+        // Actualiza el mensaje con la nueva página y cartas
         await i.update({
           embeds: [createEmbed(currentPage)],
           components: [getButtonRow(currentPage, totalPages)],
