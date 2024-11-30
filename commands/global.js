@@ -2,11 +2,6 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const DroppedCard = require('../models/DroppedCard');
 const rarityToEmojis = require('../utils/rarityToEmojis');
 
-// Función para escapar caracteres especiales en una expresión regular
-const escapeRegex = (text) => {
-  return text.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'); // Escapa los caracteres especiales
-};
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('global')
@@ -42,11 +37,15 @@ module.exports = {
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
 
+    const cleanString = (str) => {
+  return String(str).replace(/[^\w\s]/g, '').toLowerCase().trim(); // Limpiar caracteres especiales y quitar espacios al inicio y al final
+};
+
       // Filtrar las cartas en la base de datos
       const query = {};
-      if (idolFilter) query.idol = new RegExp(idolFilter, 'i');
-      if (grupoFilter) query.grupo = new RegExp(escapeRegex(grupoFilter), 'i'); // Escapar el grupo
-      if (eraFilter) query.era = new RegExp(eraFilter, 'i');
+      if (idolFilter) query.idol = new RegExp(cleanString(idolFilter), 'i');
+      if (grupoFilter) query.grupo = new RegExp(cleanString(grupoFilter), 'i');
+      if (eraFilter) query.era = new RegExp(cleanString(eraFilter), 'i');
       if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
       if (rarity) query.rarity = rarity;
 
