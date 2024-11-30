@@ -60,7 +60,7 @@ module.exports = {
       if (grupoFilter) query.grupo = new RegExp(escapeRegex(grupoFilter), 'i');
       if (eraFilter) query.era = new RegExp(escapeRegex(eraFilter), 'i');
       if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
-      if (rarity) query.rarity = rarity; 
+      if (rarityFilter) query.rarity = rarityFilter;
 
       // Obtener el total de cartas que coinciden con el filtro
       const totalCards = await DroppedCard.countDocuments(query);
