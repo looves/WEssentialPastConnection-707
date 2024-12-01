@@ -24,9 +24,6 @@ module.exports = {
     const grupoFilter = interaction.options.getString('grupo');
     const itemsPerPage = 2; // Número de ítems a mostrar por página
 
-    // Deferir la respuesta inmediatamente para evitar que expire la interacción
-    await interaction.deferReply();
-
     try {
       let filter = {};
 
@@ -39,14 +36,19 @@ module.exports = {
         filter.grupo = new RegExp(escapedGrupoFilter, 'i'); // Búsqueda insensible a mayúsculas/minúsculas
       }
 
-      // Buscar las cartas que coinciden con el filtro
-      const allCards = await Card.find(filter);
+      // Optimización: Usar proyecciones para obtener solo los campos necesarios
+      const allCards = await Card.find(filter)
+        .select('idol grupo era eshort rarity') // Seleccionar solo los campos necesarios
+        .lean(); // Usar `lean()` para mejorar el rendimiento
+
       if (allCards.length === 0) {
-        return interaction.editReply(`No se encontraron cartas para el idol ${idolFilter || ''} en el grupo ${grupoFilter || ''}.`);
+        return interaction.reply(`No se encontraron cartas para el idol ${idolFilter || ''} en el grupo ${grupoFilter || ''}.`);
       }
 
-      // Buscar las cartas que el usuario ya tiene
-      const userCards = await DroppedCard.find({ userId: interaction.user.id });
+      // Optimización: Usar un Set para las cartas del usuario (esto reduce el tiempo de búsqueda)
+      const userCards = await DroppedCard.find({ userId: interaction.user.id }).lean();
+      const userCardSet = new Set(userCards.map(card => `${card.idol}|${card.grupo}|${card.era}|${card.eshort}|${card.rarity}`));
+
       const checklist = {};
 
       // Acumular los ídolos en el checklist
@@ -60,16 +62,9 @@ module.exports = {
           checklist[key][card.idol] = { rarity1: false, rarity2: false, rarity3: false };
         }
 
-        // Verificar si el usuario tiene la carta
-        const hasCard = userCards.find(droppedCard =>
-          droppedCard.idol === card.idol &&
-          droppedCard.grupo === card.grupo &&
-          droppedCard.era === card.era &&
-          droppedCard.eshort === card.eshort &&
-          droppedCard.rarity === card.rarity
-        );
-
-        if (hasCard) {
+        // Verificar si el usuario tiene la carta utilizando el Set
+        const cardIdentifier = `${card.idol}|${card.grupo}|${card.era}|${card.eshort}|${card.rarity}`;
+        if (userCardSet.has(cardIdentifier)) {
           checklist[key][card.idol][`rarity${card.rarity}`] = true;
         }
       });
@@ -151,6 +146,9 @@ module.exports = {
           );
       };
 
+      // Deferir la respuesta para habilitar los botones interactivos
+      await interaction.deferReply();
+
       // Enviar la respuesta inicial
       const message = await interaction.editReply({ embeds: [createEmbed(currentPage)], components: [createButtons(currentPage)] });
 
@@ -167,7 +165,7 @@ module.exports = {
         if (i.customId === 'next' && currentPage < totalPages - 1) currentPage++;
         if (i.customId === 'last') currentPage = totalPages - 1;
         if (i.customId === 'close') {
-          await i.update({ content: `**</checklist:1291579000044650507> cerrado...**`, embeds: [], components: [] });
+          await i.update({ content: '**/checklist cerrado**', embeds: [], components: [] });
           collector.stop();  // Detener el colector cuando se cierre
           return;
         }
