@@ -23,13 +23,14 @@ module.exports = {
         .setDescription('Obtén una card aleatoria.'),
 
     async execute(interaction) {
-        try {
+
+          try {
             await interaction.deferReply();
-        } catch (error) {
+          } catch (error) {
             // Si hay un error al deferir la respuesta, simplemente hacer un return para evitar que el bot se caiga
             console.error('Error al deferir la respuesta:', error);
             return; // Termina la ejecución del comando si ocurre un error
-        }
+          }// Defer the reply immediately
 
         const userId = interaction.user.id;
         const currentTime = Date.now();
@@ -42,21 +43,21 @@ module.exports = {
         );
         const user = await User.findOne({ userId });
 
-        // Llamada a checkBan para verificar si el usuario está baneado
-        if (await checkBan(userId)) {
-            return interaction.editReply(`No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
-        }
-
+           // Llamada a checkBan para verificar si el usuario está baneado
+            if (await checkBan(userId)) {
+                return interaction.editReply(No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.);
+            }
+        
         // Determinar el cooldown basado en el rol
         let cooldownTime = BASE_COOLDOWN_TIME;
 
-        const member = await interaction.guild.members.fetch(userId);
-
-        if (member.roles.cache.has(PATREON_ROLE_ID)) {
-            cooldownTime = PATREON_COOLDOWN_TIME;
-        } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
-            cooldownTime = BOOSTER_COOLDOWN_TIME;
+        if (interaction.guild.members.cache.get(userId).roles.cache.has(PATREON_ROLE_ID)) {
+            cooldownTime = PATREON_COOLDOWN_TIME; 
+        } 
+        else if (interaction.guild.members.cache.get(userId).roles.cache.has(BOOSTER_ROLE_ID)) {
+            cooldownTime = BOOSTER_COOLDOWN_TIME; 
         }
+
 
         // Verificar si el usuario está en cooldown
         if (user.lastDrop) {
@@ -67,22 +68,22 @@ module.exports = {
                 const remainingTime = cooldownTime - timeElapsed;
                 const minutes = Math.floor(remainingTime / 60000);
                 const seconds = Math.floor((remainingTime % 60000) / 1000);
-                return interaction.editReply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando </drop:1291579000044650509> nuevamente!`);
+                return interaction.editReply(¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando </drop:1291579000044650509> nuevamente!);
             }
         }
 
         try {
-            // Consulta de cartas optimizada usando lean() para evitar instancias de Mongoose
-            const cards = await db.fetchData().lean();
+            const cards = await db.fetchData();
 
             if (cards.length === 0) {
                 return interaction.editReply('No hay cartas disponibles en la base de datos.');
             }
 
+            const member = await interaction.guild.members.fetch(userId);
             const selectedCard = await selectCard(cards, member);
 
             const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity));
-            const cardCode = `${selectedCard.idol[0]}${selectedCard.grupo[0]}${selectedCard.era[0]}${selectedCard.rarity}`;
+            const cardCode = ${selectedCard.idol[0]}${selectedCard.grupo[0]}${selectedCard.era[0]}${selectedCard.rarity};
 
             // Incrementar el contador de cartas y actualizar el inventario
             const { copyNumber } = await incrementCardCount(userId, selectedCard._id);
@@ -114,26 +115,28 @@ module.exports = {
 
             const imageUrl = selectedCard.image;
             const extension = getImageExtension(imageUrl);
-            const attachment = new AttachmentBuilder(imageUrl, { name: `${cardCode}${extension}` });
+            const attachment = new AttachmentBuilder(imageUrl, { name: ${cardCode}${extension} });
+            
 
             // Lógica para determinar el level
             let level = 'level 0';
             if (member.roles.cache.has(PATREON_ROLE_ID)) {
                 level = 'level 2';
             } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
-                level = 'level 1';
+                level = 'level 1'; 
             }
+
 
             const embed = new EmbedBuilder()
                 .setColor('#60a5fa')
-                .setDescription(`_ _<@${interaction.user.id}>, adquiriste a \`${selectedCard.idol}\` de **${selectedCard.grupo}**\n_ _ **${selectedCard.era}** <:dot:1291582825232994305> \`#${copyNumber}\`\n_ _ \`\`\`${uniqueCode}\`\`\`\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \`${level}\``);
+                .setDescription(_ _<@${interaction.user.id}>, adquiriste a \${selectedCard.idol}\ de **${selectedCard.grupo}**\n_ _ **${selectedCard.era}** <:dot:1291582825232994305> \#${copyNumber}\\n_ _ \\\${uniqueCode}\\\\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \${level}\`);
 
             // Responder con el embed y la imagen
             await interaction.editReply({ embeds: [embed], files: [attachment] });
 
             // Mensaje para el cooldown
             setTimeout(() => {
-                interaction.channel.send(`<@${userId}>, el comando </drop:1291579000044650509> ya está disponible nuevamente!`).catch(console.error);
+                interaction.channel.send(<@${userId}>, el comando </drop:1291579000044650509> ya está disponible nuevamente!).catch(console.error);
             }, cooldownTime);
 
         } catch (error) {
