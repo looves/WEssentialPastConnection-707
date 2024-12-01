@@ -23,14 +23,13 @@ module.exports = {
         .setDescription('Obtén una card aleatoria.'),
 
     async execute(interaction) {
-
-          try {
+        try {
             await interaction.deferReply();
-          } catch (error) {
+        } catch (error) {
             // Si hay un error al deferir la respuesta, simplemente hacer un return para evitar que el bot se caiga
             console.error('Error al deferir la respuesta:', error);
             return; // Termina la ejecución del comando si ocurre un error
-          }// Defer the reply immediately
+        }
 
         const userId = interaction.user.id;
         const currentTime = Date.now();
@@ -43,21 +42,21 @@ module.exports = {
         );
         const user = await User.findOne({ userId });
 
-           // Llamada a checkBan para verificar si el usuario está baneado
-            if (await checkBan(userId)) {
-                return interaction.editReply(`No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
-            }
-        
+        // Llamada a checkBan para verificar si el usuario está baneado
+        if (await checkBan(userId)) {
+            return interaction.editReply(`No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
+        }
+
         // Determinar el cooldown basado en el rol
         let cooldownTime = BASE_COOLDOWN_TIME;
 
-        if (interaction.guild.members.cache.get(userId).roles.cache.has(PATREON_ROLE_ID)) {
-            cooldownTime = PATREON_COOLDOWN_TIME; 
-        } 
-        else if (interaction.guild.members.cache.get(userId).roles.cache.has(BOOSTER_ROLE_ID)) {
-            cooldownTime = BOOSTER_COOLDOWN_TIME; 
-        }
+        const member = await interaction.guild.members.fetch(userId);
 
+        if (member.roles.cache.has(PATREON_ROLE_ID)) {
+            cooldownTime = PATREON_COOLDOWN_TIME;
+        } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
+            cooldownTime = BOOSTER_COOLDOWN_TIME;
+        }
 
         // Verificar si el usuario está en cooldown
         if (user.lastDrop) {
@@ -73,13 +72,13 @@ module.exports = {
         }
 
         try {
-            const cards = await db.fetchData();
+            // Consulta de cartas optimizada usando lean() para evitar instancias de Mongoose
+            const cards = await db.fetchData().lean();
 
             if (cards.length === 0) {
                 return interaction.editReply('No hay cartas disponibles en la base de datos.');
             }
 
-            const member = await interaction.guild.members.fetch(userId);
             const selectedCard = await selectCard(cards, member);
 
             const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity));
@@ -116,16 +115,14 @@ module.exports = {
             const imageUrl = selectedCard.image;
             const extension = getImageExtension(imageUrl);
             const attachment = new AttachmentBuilder(imageUrl, { name: `${cardCode}${extension}` });
-            
 
             // Lógica para determinar el level
             let level = 'level 0';
             if (member.roles.cache.has(PATREON_ROLE_ID)) {
                 level = 'level 2';
             } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
-                level = 'level 1'; 
+                level = 'level 1';
             }
-
 
             const embed = new EmbedBuilder()
                 .setColor('#60a5fa')
