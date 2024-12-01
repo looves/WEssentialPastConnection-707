@@ -167,7 +167,7 @@ module.exports = {
         if (i.customId === 'next' && currentPage < totalPages - 1) currentPage++;
         if (i.customId === 'last') currentPage = totalPages - 1;
         if (i.customId === 'close') {
-          await i.update({ content: '**/checklist cerrado**', embeds: [], components: [] });
+          await i.update({ content: `**</checklist:1291579000044650507> cerrado...**`, embeds: [], components: [] });
           collector.stop();  // Detener el colector cuando se cierre
           return;
         }
