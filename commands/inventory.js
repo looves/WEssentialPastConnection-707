@@ -141,7 +141,7 @@ module.exports = {
         } else if (i.customId === 'last') {
           currentPage = totalPages - 1;
         } else if (i.customId === 'close') {
-          await i.update({ content: `**</inventory:1291579000044650513> close...**`, embeds: [], components: [] });
+          await i.update({ content: `**</inventory:1291579000044650513> cerrado...**`, embeds: [], components: [] });
           collector.stop();  // Detener el colector después de cerrar
           return;
         }
