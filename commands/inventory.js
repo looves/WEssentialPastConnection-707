@@ -1,5 +1,4 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const DroppedCard = require('../models/DroppedCard');
 const rarityToEmojis = require('../utils/rarityToEmojis');
 
@@ -27,14 +26,6 @@ module.exports = {
         .setDescription('Filtra por rareza de la carta.')),
 
   async execute(interaction) {
-    try {
-      // Deferir la respuesta
-      await interaction.deferReply();
-    } catch (error) {
-      console.error('Error al deferir la respuesta:', error);
-      return; // Termina la ejecución del comando si ocurre un error
-    }
-
     const userId = interaction.options.getUser('user')?.id || interaction.user.id;
     const idolFilter = interaction.options.getString('idol');
     const grupoFilter = interaction.options.getString('grupo');
@@ -42,46 +33,42 @@ module.exports = {
     const eshortFilter = interaction.options.getString('eshort');
     const rarityFilter = interaction.options.getString('rarity');
 
-    const user = await interaction.client.users.fetch(userId);
-
     try {
-      // Paginación: Definir la página y número máximo de cartas por página
-      const maxFields = 9;
-      let currentPage = 0;  // Página inicial
+      await interaction.deferReply();
 
+      // Escapar caracteres especiales en las búsquedas
+      const escapeRegex = (text) => {
+        return text.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&');
+      };
 
-         const escapeRegex = (text) => {
-  return text.replace(/[.*+?^=!:${}()|\[\]\/\\]/g, '\\$&'); // Escapa los caracteres especiales
-};
-
-      // Filtrar las cartas en la base de datos
-      const query = {};
+      // Construir la consulta
+      const query = { userId }; // Filtro por usuario
       if (idolFilter) query.idol = new RegExp(escapeRegex(idolFilter), 'i');
       if (grupoFilter) query.grupo = new RegExp(escapeRegex(grupoFilter), 'i');
       if (eraFilter) query.era = new RegExp(escapeRegex(eraFilter), 'i');
-      if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
-      if (rarityFilter) query.rarity = rarityFilter;
+      if (eshortFilter) query.eshort = new RegExp(escapeRegex(eshortFilter), 'i');
+      if (rarityFilter) query.rarity = new RegExp(escapeRegex(rarityFilter), 'i');
 
-      // Obtener el total de cartas que coinciden con el filtro
+      // Contar el número total de cartas que coinciden con los filtros
       const totalCards = await DroppedCard.countDocuments(query);
-
       if (totalCards === 0) {
-        return interaction.editReply('No tienes cartas en tu inventario.'); // Cambiado a editReply
+        return interaction.editReply({ content: 'No tienes cartas en tu inventario que coincidan con los filtros especificados.', ephemeral: true });
       }
 
+      const maxFields = 9;  // Mostrar 9 cartas por página
       const totalPages = Math.ceil(totalCards / maxFields);
+      let currentPage = 0;  // Página inicial
 
-      // Función para generar el embed de una página
-      const generateEmbed = async (page) => {
-        const skip = page * maxFields;
-        const cards = await DroppedCard.find(query)  // Realizar la consulta con los filtros
-          .select('idol eshort grupo copyNumber rarity uniqueCode') // Seleccionar solo los campos necesarios
-          .skip(skip)  // Omitir las cartas de páginas anteriores
-          .limit(maxFields)  // Limitar a las cartas de la página actual
+      // Función para crear el embed de la página actual
+      const createEmbed = async (page) => {
+        const cards = await DroppedCard.find(query)  // Buscar cartas con los filtros aplicados
+          .select('idol eshort grupo copyNumber rarity uniqueCode')  // Seleccionar solo los campos necesarios
+          .skip(page * maxFields)  // Omitir los resultados previos
+          .limit(maxFields)  // Limitar a 9 resultados
           .lean();  // Usar lean para mejorar el rendimiento
 
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${user.username}'s Inventory`, iconURL: user.displayAvatarURL() })
+          .setAuthor({ name: `${interaction.user.username}'s Inventory`, iconURL: interaction.user.displayAvatarURL() })
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
@@ -97,50 +84,50 @@ module.exports = {
         return embed;
       };
 
-      const getButtonRow = (page) => {
-        return new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('first')
-            .setEmoji("<:first:1290467842462060605>") // Primera Página
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page === 0),
-          new ButtonBuilder()
-            .setCustomId('previous')
-            .setEmoji("<:prev:1290467827739787375>") // Anterior
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page === 0),
-          new ButtonBuilder()
-            .setCustomId('close')
-            .setEmoji("<:close:1290467856437481574>") // Cerrar Inventario
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId('next')
-            .setEmoji("<:next:1290467800065769566>") // Siguiente
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page === totalPages - 1),
-          new ButtonBuilder()
-            .setCustomId('last')  // Última Página
-            .setEmoji("<:last:1290467815127519322>")
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(page === totalPages - 1)
-        );
+      // Crear los botones de navegación
+      const getButtonRow = (currentPage, totalPages) => {
+        return new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('first')
+              .setEmoji("<:first:1290467842462060605>")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(currentPage === 0),
+            new ButtonBuilder()
+              .setCustomId('previous')
+              .setEmoji("<:prev:1290467827739787375>")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(currentPage === 0),
+            new ButtonBuilder()
+              .setCustomId('close')
+              .setEmoji("<:close:1290467856437481574>")
+              .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+              .setCustomId('next')
+              .setEmoji("<:next:1290467800065769566>")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(currentPage >= totalPages - 1),
+            new ButtonBuilder()
+              .setCustomId('last')
+              .setEmoji("<:last:1290467815127519322>")
+              .setStyle(ButtonStyle.Secondary)
+              .setDisabled(currentPage >= totalPages - 1)
+          );
       };
 
-      // Enviar el primer embed y los botones
+      // Mostrar la respuesta inicial con los botones
       const message = await interaction.editReply({
-        embeds: [await generateEmbed(currentPage)], // editReply en lugar de reply
-        components: [getButtonRow(currentPage)],
-        fetchReply: true
+        embeds: [await createEmbed(currentPage)],
+        components: [getButtonRow(currentPage, totalPages)],
       });
 
-      // Crear un collector para manejar las interacciones de botones
+      // Configurar el colector de botones
       const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60000 });
 
       collector.on('collect', async i => {
-        // Verifica que la interacción pertenezca al mensaje correcto
+        // Verificar que la interacción pertenece al mensaje correcto
         if (i.message.id !== message.id) return;
-
-        // Verifica que el usuario es el que ejecutó el comando
+        // Verificar que el usuario es el que ejecutó el comando
         if (i.user.id !== interaction.user.id) {
           return i.reply({ content: 'No puedes interactuar con este botón.', ephemeral: true });
         }
@@ -154,21 +141,26 @@ module.exports = {
         } else if (i.customId === 'last') {
           currentPage = totalPages - 1;
         } else if (i.customId === 'close') {
-          await i.update({ content: '**/inventory cerrado...**', embeds: [], components: [] });
-          return collector.stop(); // Detener el colector después de cerrar
+          await i.update({ content: `**</inventory:1291579000044650513> close...**`, embeds: [], components: [] });
+          collector.stop();  // Detener el colector después de cerrar
+          return;
         }
 
-        // Solo actualizamos si la interacción no fue cerrada
-        await i.update({ embeds: [await generateEmbed(currentPage)], components: [getButtonRow(currentPage)] });
+        // Actualizar el mensaje con la nueva página
+        await i.update({
+          embeds: [await createEmbed(currentPage)],
+          components: [getButtonRow(currentPage, totalPages)],
+        });
       });
 
       collector.on('end', async () => {
-        await message.edit({ components: [] }); // Se eliminan los botones después de que termine la interacción
+        // Deshabilitar los botones después de que termine el tiempo
+        await message.edit({ components: [] });
       });
 
     } catch (error) {
       console.error('Error al ejecutar el comando /inventory:', error);
-      await interaction.editReply('Ocurrió un error al procesar el comando.'); // Cambiado a editReply
+      await interaction.editReply({ content: 'Hubo un error al procesar el comando. Por favor, inténtalo de nuevo.', ephemeral: true });
     }
-  },
+  }
 };
