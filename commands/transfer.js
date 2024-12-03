@@ -188,7 +188,7 @@ module.exports = {
           });
         });
 
-        const combinedImageBuffer = await combineCardImagesWithCopyNumber(cardData);
+        const combinedImageBuffer = await combineCardImagesWithoutCopyNumber(cardData);
 
         const rowCartas = new ActionRowBuilder()
           .addComponents(
