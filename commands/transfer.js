@@ -5,29 +5,23 @@ const User = require('../models/User');
 const axios = require('axios');
 const sharp = require('sharp');
 
-// Función para descargar y redimensionar imágenes con texto de CopyNumber
-async function fetchImagesWithCopyNumber(cardData) {
+// Función para descargar y redimensionar imágenes sin texto de CopyNumber
+async function fetchImagesWithoutCopyNumber(cardData) {
   const cardWidth = 1080; // Ancho fijo
   const cardHeight = 1669; // Alto fijo
 
   const imageBuffers = [];
   const urlCache = new Set(); // Usamos un Set para evitar duplicados
 
-  for (const { url, copyNumber } of cardData) {
-    const uniqueKey = `${url}-${copyNumber}`;
+  for (const { url } of cardData) {
+    const uniqueKey = `${url}`;
     if (!urlCache.has(uniqueKey)) {
       const response = await axios.get(url, { responseType: 'arraybuffer' });
 
-      const svgText = `<svg width="${cardWidth}" height="${cardHeight}">
-                        <text x="50%" y="${cardHeight - 20}" font-size="90" font-weight="bold" text-anchor="middle" fill="white" font-family="Impact">
-                          #${copyNumber}
-                        </text>
-                      </svg>`;
-
+      // Redimensionar la imagen sin agregar el texto de CopyNumber
       const imageBuffer = await sharp(response.data)
         .resize(cardWidth, cardHeight)
-        .composite([{ input: Buffer.from(svgText), gravity: 'south' }])
-        .toBuffer();
+        .toBuffer();  // Solo redimensionamos la imagen, sin texto
 
       urlCache.add(uniqueKey);
       imageBuffers.push(imageBuffer);
@@ -37,8 +31,8 @@ async function fetchImagesWithCopyNumber(cardData) {
   return imageBuffers;
 }
 
-// Función para combinar imágenes en una cuadrícula 3x3
-async function combineCardImagesWithCopyNumber(cardData) {
+// Función para combinar imágenes en una cuadrícula 3x3 (sin CopyNumber)
+async function combineCardImagesWithoutCopyNumber(cardData) {
   try {
     const cardCount = cardData.length;
     if (cardCount === 0) throw new Error('No hay imágenes para combinar.');
@@ -49,7 +43,7 @@ async function combineCardImagesWithCopyNumber(cardData) {
     const cardWidth = 1080;
     const cardHeight = 1669;
 
-    const imageBuffers = await fetchImagesWithCopyNumber(cardData);
+    const imageBuffers = await fetchImagesWithoutCopyNumber(cardData);
 
     const combinedImage = sharp({
       create: {
@@ -72,6 +66,7 @@ async function combineCardImagesWithCopyNumber(cardData) {
     throw new Error('No se pudo combinar las imágenes.');
   }
 }
+
 
 module.exports = {
   data: new SlashCommandBuilder()
