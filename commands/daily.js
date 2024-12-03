@@ -51,26 +51,28 @@ module.exports = {
         });
       }
 
-      // Obtener todas las cartas con rareza 2
-      const cards = await Card.find({ rarity: 2 });
+      // Obtener una carta aleatoria con rareza 2 usando agregación
+      const selectedCard = await Card.aggregate([
+        { $match: { rarity: 2 } },
+        { $sample: { size: 1 } }
+      ]);
 
       // Si no hay cartas con rareza 2
-      if (cards.length === 0) {
+      if (selectedCard.length === 0) {
         return interaction.followUp({
           content: 'No hay cartas con rareza 2 disponibles.',
           ephemeral: true,
         });
       }
 
-      // Selecciona una carta aleatoria entre las cartas con rareza 2
-      const selectedCard = cards[Math.floor(Math.random() * cards.length)];
+      const card = selectedCard[0];
 
       // Generar un código único para la carta obtenida
-      const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity));
-      const cardCode = `${selectedCard.idol[0].toUpperCase()}${selectedCard.grupo[0].toUpperCase()}${selectedCard.era[0].toUpperCase()}${selectedCard.rarity}`;
+      const uniqueCode = generateCardCode(card.idol, card.grupo, card.era, String(card.rarity));
+      const cardCode = `${card.idol[0].toUpperCase()}${card.grupo[0].toUpperCase()}${card.era[0].toUpperCase()}${card.rarity}`;
 
       // Incrementar el contador y actualizar el inventario en paralelo
-      const incrementPromise = incrementCardCount(userId, selectedCard._id);
+      const incrementPromise = incrementCardCount(userId, card._id);
 
       const { copyNumber } = await incrementPromise;
 
@@ -82,21 +84,21 @@ module.exports = {
       // Crear la carta caída
       const droppedCard = new DroppedCard({
         userId,
-        cardId: selectedCard._id,
-        idol: selectedCard.idol,
-        grupo: selectedCard.grupo,
-        era: selectedCard.era,
-        eshort: selectedCard.eshort,
-        rarity: selectedCard.rarity,
+        cardId: card._id,
+        idol: card.idol,
+        grupo: card.grupo,
+        era: card.era,
+        eshort: card.eshort,
+        rarity: card.rarity,
         uniqueCode,
         command: '/daily',
         copyNumber,
       });
 
-      // Guardar la carta caída y actualizar el inventario
+      // Operaciones en paralelo para guardar la carta caída y actualizar el inventario
       await Promise.all([
         droppedCard.save(),
-        updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }])
+        updateInventory(userId, [{ cardId: card._id, count: copyNumber }])
       ]);
 
       // Añadir monedas al usuario y actualizar la fecha
@@ -105,7 +107,7 @@ module.exports = {
       await user.save();
 
       // Define la extensión del archivo en función de la imagen
-      const imageUrl = selectedCard.image;
+      const imageUrl = card.image;
       const extension = getImageExtension(imageUrl);
       const fileName = `${cardCode}${extension}`;
 
