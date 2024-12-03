@@ -5,15 +5,14 @@ const getImageExtension = require('../utils/getImageExtension');
 const axios = require('axios');
 const sharp = require('sharp');
 
-// Función para descargar y redimensionar imágenes sin duplicados y agregar texto de CopyNumber
-// Función para descargar y redimensionar imágenes sin duplicados y agregar texto de CopyNumber
+// Función para descargar y redimensionar imágenes sin duplicados (sin CopyNumber)
 async function fetchImages(cardUrls, copyNumbers) {
   const cardWidth = 1080;  // Ancho fijo para redimensionar
   const cardHeight = 1669; // Alto fijo para redimensionar
 
   // Lista para almacenar los buffers de imagen
   const imageBuffers = [];
-  // Objeto para almacenar la URL de cada carta con su código único (incluyendo copyNumber)
+  // Objeto para almacenar la URL de cada carta con su código único (sin CopyNumber)
   const urlCache = {};
 
   // Recorremos las URLs de las cartas
@@ -28,21 +27,10 @@ async function fetchImages(cardUrls, copyNumbers) {
       // Si la URL y copyNumber no están en el cache, la descargamos y procesamos
       const response = await axios.get(url, { responseType: 'arraybuffer' });
 
-      // Crear el SVG con el texto de CopyNumber
-      const svgText = `<svg width="${cardWidth}" height="${cardHeight}">
-                        <text x="50%" y="${cardHeight - 20}" font-size="90" font-weight="bold" text-anchor="middle" fill="white" font-family="Impact">
-                          #${copyNumber}
-                        </text>
-                      </svg>`;
-
-      // Redimensionar la imagen, agregar el texto y devolver el buffer
+      // Redimensionar la imagen (sin agregar el texto de CopyNumber)
       const imageBuffer = await sharp(response.data)
         .resize(cardWidth, cardHeight) // Redimensionamos la imagen
-        .composite([{
-          input: Buffer.from(svgText),
-          gravity: 'south'  // Ubicamos el texto en la parte inferior
-        }])
-        .toBuffer();
+        .toBuffer();  // No agregamos ningún texto
 
       // Guardamos el buffer de la imagen y la URL + copyNumber en el cache
       urlCache[cacheKey] = imageBuffer;
@@ -52,7 +40,6 @@ async function fetchImages(cardUrls, copyNumbers) {
 
   return imageBuffers;
 }
-
 
 // Función para combinar las imágenes en una cuadrícula de 3x3
 async function combineCardImages(cardUrls, copyNumbers) {
