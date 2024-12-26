@@ -18,31 +18,36 @@ module.exports = {
     .addStringOption(option =>
       option.setName('request')
         .setDescription('Los códigos de las cartas que deseas recibir, separados por espacios.')
-        .setRequired(true)),
-    
+        .setRequired(true))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
+
   async execute(interaction) {
     const usuario = interaction.options.getUser('user');
     const ofertaCodes = interaction.options.getString('offer').split(' ').map(code => code.trim());
     const pedirCodes = interaction.options.getString('request').split(' ').map(code => code.trim());
     const usuarioIniciador = interaction.user;
 
+    // Diferir la respuesta para evitar el error de "ya respondida"
+    await interaction.deferReply();
+    
     // Verificar si el usuario que inicia el intercambio está baneado
     if (await checkBan(usuarioIniciador.id)) {
-      return interaction.reply({ content: `No puedes usar \`/trade\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`, ephemeral: true });
+      return interaction.editReply({ content: `No puedes usar \`/trade\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`, ephemeral: true });
     }
 
     // Verificar si el usuario receptor está baneado
     if (await checkBan(usuario.id)) {
-      return interaction.reply({ content: `El usuario **${usuario.username}** está baneado y no puede participar en trades.`, ephemeral: true });
+      return interaction.editReply({ content: `El usuario **${usuario.username}** está baneado y no puede participar en trades.`, ephemeral: true });
     }
-    
+
     if (usuario.id === usuarioIniciador.id) {
-      return interaction.reply({ content: 'No puedes intercambiar cartas contigo mismo.', ephemeral: true });
+      return interaction.editReply({ content: 'No puedes intercambiar cartas contigo mismo.', ephemeral: true });
     }
 
     // Limitar el número de cartas ofrecidas y solicitadas a 4
     if (ofertaCodes.length > 4 || pedirCodes.length > 4) {
-      return interaction.reply({ content: 'Puedes intercambiar hasta 4 cartas a la vez.', ephemeral: true });
+      return interaction.editReply({ content: 'Puedes intercambiar hasta 4 cartas a la vez.', ephemeral: true });
     }
 
     try {
@@ -54,10 +59,10 @@ module.exports = {
       const cartasPedidasFaltantes = pedirCodes.filter(code => !cartasPedidas.some(card => card.uniqueCode === code));
 
       if (cartasOfrecidasFaltantes.length > 0) {
-        return interaction.reply({ content: `No posees las siguientes cartas para ofrecer: ${cartasOfrecidasFaltantes.join(', ')}`, ephemeral: true });
+        return interaction.editReply({ content: `No posees las siguientes cartas para ofrecer: ${cartasOfrecidasFaltantes.join(', ')}`, ephemeral: true });
       }
       if (cartasPedidasFaltantes.length > 0) {
-        return interaction.reply({ content: `${usuario.username} no posee las siguientes cartas que solicitas: ${cartasPedidasFaltantes.join(', ')}`, ephemeral: true });
+        return interaction.editReply({ content: `${usuario.username} no posee las siguientes cartas que solicitas: ${cartasPedidasFaltantes.join(', ')}`, ephemeral: true });
       }
 
       const embed = new EmbedBuilder()
@@ -66,10 +71,28 @@ module.exports = {
         .setDescription(`__**${usuarioIniciador.username}**__ quiere intercambiar cartas con __**${usuario.username}**__`);
 
       // Agregar campos para las cartas ofrecidas
-      embed.addFields({ name: 'offer:', value: cartasOfrecidas.map(card => `**${card.idol}**<:dot:1296707029087555604>\`#${card.copyNumber}\`\n${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``).join('\n'), inline: true });
+      embed.addFields({
+        name: 'offer:',
+        value: cartasOfrecidas.map(card => {
+            let emoji = rarityToEmojis(card.rarity);  // Emoji de rareza por defecto
+            if (card.event) {
+              emoji = rarityToEmojis(card.event);  // Emoji de evento si está presente
+            }
+            // Devolver la representación de la carta con el emoji correspondiente
+            return `**${card.idol}**<:dot:1296707029087555604>\`#${card.copyNumber}\`\n${emoji} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``;}).join('\n'), inline: true
+      });
 
       // Agregar campos para las cartas solicitadas
-      embed.addFields({ name: 'request:', value: cartasPedidas.map(card => `**${card.idol}**<:dot:1296707029087555604>\`#${card.copyNumber}\`\n${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``).join('\n'), inline: true });
+      embed.addFields({
+        name: 'request:',
+        value: cartasPedidas.map(card => {
+            let emoji = rarityToEmojis(card.rarity);  // Emoji de rareza por defecto
+            if (card.event) {
+              emoji = rarityToEmojis(card.event);  // Emoji de evento si está presente
+            }
+            // Devolver la representación de la carta con el emoji correspondiente
+            return `**${card.idol}**<:dot:1296707029087555604>\`#${card.copyNumber}\`\n${emoji} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``;}).join('\n'), inline: true
+      });
 
       const row = new ActionRowBuilder()
         .addComponents(
@@ -85,14 +108,21 @@ module.exports = {
             .setStyle(ButtonStyle.Danger)
         );
 
-      await interaction.reply({ content: `${usuario}, tienes que aceptar o rechazar el intercambio.`, embeds: [embed], components: [row] });
+
+      // Enviar el mensaje de intercambio con botones
+      const trade = await interaction.editReply({
+        content: `${usuario}, tienes que aceptar o rechazar el intercambio.`, 
+        embeds: [embed], 
+        components: [row] 
+      });
 
       const filter = i => (i.customId === 'accept_trade' || i.customId === 'cancel_trade') && i.user.id === usuario.id;
-      const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
+      const collector = trade.createMessageComponentCollector({ filter, time: 60000 });
 
       collector.on('collect', async i => {
         if (i.customId === 'accept_trade') {
           try {
+            // Realizar el intercambio si acepta
             for (const card of cartasOfrecidas) {
               card.userId = usuario.id;
               await card.save();
@@ -120,9 +150,10 @@ module.exports = {
           interaction.editReply({ content: 'El tiempo para aceptar el intercambio ha expirado.', embeds: [], components: [] });
         }
       });
+
     } catch (error) {
       console.error('Error al ejecutar el comando /trade:', error);
-      await interaction.reply('Hubo un error al procesar el intercambio. Por favor, inténtalo de nuevo.');
+      await interaction.editReply('Hubo un error al procesar el intercambio. Por favor, inténtalo de nuevo.');
     }
   },
 };
