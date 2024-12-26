@@ -7,7 +7,9 @@ const DroppedCard = require('../models/DroppedCard');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('work')
-    .setDescription('Gana monedas entre 25 y 65. Debes tener una carta favorita definida para usar este comando.'),
+    .setDescription('Gana monedas entre 25 y 65. Debes tener una carta favorita definida para usar este comando.')
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const userId = interaction.user.id;
