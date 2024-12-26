@@ -98,7 +98,9 @@ module.exports = {
     .addStringOption(option =>
       option.setName('codes')
         .setDescription('Códigos únicos de las cartas, separados por espacio')
-        .setRequired(true)),
+        .setRequired(true))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     // Obtener y procesar los códigos (eliminar espacios adicionales)
