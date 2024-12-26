@@ -5,10 +5,10 @@ const cardSchema = new Schema({
   grupo: { type: String, required: true, index: true },
   era: { type: String, required: true, index: true },
   eshort: { type: String, required: true, index: true },
-  rarity: { type: String, required: true, index: true }, // Agregado
+  rarity: { type: String, required: true, index: true },
   image: { type: String, required: true, index: true },
-  event: { type: String, default: false, index: true },
-  count: { type: Number, default: 0 }, // Para llevar el conteo de apariciones
+  event: { type: String, required: true, index: true },
+  count: { type: Number, default: 0 }, 
 });
 
 module.exports = model('Card', cardSchema);
