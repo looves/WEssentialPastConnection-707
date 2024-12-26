@@ -5,7 +5,9 @@ const User = require('../models/User');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('balance')
-    .setDescription('Muestra el balance de monedas acumuladas del usuario.'),
+    .setDescription('Muestra el balance de monedas acumuladas del usuario.')
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const userId = interaction.user.id;
