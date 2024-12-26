@@ -208,7 +208,7 @@ try {
 
           embedCartas.addFields({
             name: `${card.idol}<:dot:1291582825232994305> \`#${carta.copyNumber}\``,
-            value: `${rarityToEmojis(carta.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${carta.uniqueCode}\`\`\``
+            value: `${emoji} ${card.grupo} ${card.eshort}\n\`\`\`${carta.uniqueCode}\`\`\``
           });
         });
 
