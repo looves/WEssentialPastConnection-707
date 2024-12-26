@@ -150,7 +150,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setColor('#60a5fa')
-                .setDescription(`_ _<@${interaction.user.id}>, adquiriste a \`${selectedCard.idol}\` de **${selectedCard.grupo}**\n_ _ **${selectedCard.era || selectedCard.event}** <:dot:1291582825232994305> \`#${copyNumber}\`**${selectedCard.rarity}**\n_ _ \`\`\`${uniqueCode}\`\`\`\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \`${level}\``);
+                .setDescription(`_ _<@${interaction.user.id}>, adquiriste a \`${selectedCard.idol}\` de **${selectedCard.grupo}**\n_ _ **${selectedCard.era || selectedCard.event}** <:dot:1291582825232994305> \`#${copyNumber}\`\n_ _ \`\`\`${uniqueCode}\`\`\`\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \`${level}\``);
 
             // Responder con el embed y la imagen
             await interaction.editReply({ embeds: [embed], files: [attachment] });
