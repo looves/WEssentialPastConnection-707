@@ -12,7 +12,9 @@ module.exports = {
     .addStringOption(option =>
       option.setName('code')
         .setDescription('Código único de la carta que quieres marcar como favorita')
-        .setRequired(true)),
+        .setRequired(true))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const code = interaction.options.getString('code');
