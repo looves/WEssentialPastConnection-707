@@ -11,7 +11,9 @@ module.exports = {
     .addUserOption(option =>
       option.setName('user')
         .setDescription('El usuario cuyo perfil deseas ver.')
-    ),
+    )
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const targetUser = interaction.options.getUser('user') || interaction.user;
