@@ -12,7 +12,9 @@ const checkBan = require('../utils/checkBan'); // Importamos el utilitario check
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('daily')
-    .setDescription('Recibe una carta diaria y 150 monedas.'),
+    .setDescription('Recibe una carta diaria y 150 monedas.')
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     try {
@@ -52,7 +54,7 @@ module.exports = {
       }
 
       // Obtener cartas con rareza 2
-      const cards = await Card.find({ rarity: 2 }).limit(500); // Limitar la cantidad de resultados para evitar problemas de memoria
+      const cards = await Card.find({ rarity: 2 }).limit(700); // Limitar la cantidad de resultados para evitar problemas de memoria
 
       // Verificar si hay cartas con rareza 2 disponibles
       if (cards.length === 0) {
@@ -66,8 +68,8 @@ module.exports = {
       const selectedCard = cards[Math.floor(Math.random() * cards.length)];
 
       // Generar un código único para la carta obtenida
-      const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity));
-      const cardCode = `${selectedCard.idol[0].toUpperCase()}${selectedCard.grupo[0].toUpperCase()}${selectedCard.era[0].toUpperCase()}${selectedCard.rarity}`;
+      const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity), selectedCard.event);
+      const cardCode = `${selectedCard.idol[0]}${selectedCard.grupo[0]}${selectedCard.era[0]}${selectedCard.event || selectedCard.rarity}`;
 
       // Incrementar el contador y actualizar el inventario en paralelo
       const incrementPromise = incrementCardCount(userId, selectedCard._id);
@@ -88,6 +90,7 @@ module.exports = {
         era: selectedCard.era,
         eshort: selectedCard.eshort,
         rarity: selectedCard.rarity,
+        event: selectedCard.event,
         uniqueCode,
         command: '/daily',
         copyNumber,
