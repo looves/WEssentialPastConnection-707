@@ -17,7 +17,9 @@ module.exports = {
         .setDescription('El idol que deseas buscar'))
     .addStringOption(option =>
       option.setName('grupo')
-        .setDescription('El grupo que deseas buscar')),
+        .setDescription('El grupo que deseas buscar'))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const idolFilter = interaction.options.getString('idol');
@@ -38,7 +40,7 @@ module.exports = {
 
       // Optimización: Usar proyecciones para obtener solo los campos necesarios
       const allCards = await Card.find(filter)
-        .select('idol grupo era eshort rarity') // Seleccionar solo los campos necesarios
+        .select('idol grupo era eshort rarity event') // Seleccionar solo los campos necesarios
         .lean(); // Usar `lean()` para mejorar el rendimiento
 
       if (allCards.length === 0) {
@@ -93,19 +95,34 @@ module.exports = {
         let description = '';
 
         entries.slice(start, end).forEach(([key, idols]) => {
-          const [grupo, era, eshort] = key.split('|');
+          const [grupo, era, eshort, event] = key.split('|');
 
           description += `<:last:1290467815127519322> **${grupo}**\n` +
                          `_ _ <:next:1290467800065769566> ${era} \`${eshort}\`\n`;
 
           for (const [idol, rarities] of Object.entries(idols)) {
-            const rarityDisplay = 
-              `${rarities.rarity1 ? '<:stars:1294530231561879633>' : '<:mstars:1291582844011020398>'}` +
-              `${rarities.rarity2 ? '<:stars:1294530231561879633>' : '<:mstars:1291582844011020398>'}` +
-              `${rarities.rarity3 ? '<:stars:1294530231561879633>' : '<:mstars:1291582844011020398>'}`;
+              let rarityDisplay = '';
 
-            description += `ㅤ<:dot:1291582825232994305>${rarityDisplay}ㅤ${idol}\n`;
+              // Usamos los datos de la carta desde el checklist
+              const card = allCards.find(c => c.idol === idol && c.grupo === grupo && c.era === era && c.eshort === eshort);
+
+              // Si la carta tiene un evento, solo usamos el emoji de evento para la rareza 2
+              if (card && card.event) {
+                  rarityDisplay = `${rarities.rarity1 ? '<:mstars:1291582844011020398>' : '<:mstars:1291582844011020398>'}` +  // Rareza 1: Normal
+                                  `${rarities.rarity2 ? rarityToEmojis(card.event) : '<:mstars:1291582844011020398>'}` +    // Rareza 2: Emoji de evento
+                                  `${rarities.rarity3 ? '<:mstars:1291582844011020398>' : '<:mstars:1291582844011020398>'}`; // Rareza 3: Normal
+              } else {
+                  // Para cartas normales, usamos los emojis de rareza
+                  rarityDisplay =
+                      `${rarities.rarity1 ? '<:stars:1294530231561879633>' : '<:mstars:1291582844011020398>'}` +  // Rareza 1
+                      `${rarities.rarity2 ? '<:stars:1294530231561879633>' : '<:mstars:1291582844011020398>'}` +  // Rareza 2
+                      `${rarities.rarity3 ? '<:stars:1294530231561879633>' : '<:mstars:1291582844011020398>'}`;  // Rareza 3
+              }
+
+              description += `ㅤ<:dot:1291582825232994305>${rarityDisplay}ㅤ${idol}\n`;
           }
+
+
 
           description += '\n';
         });
@@ -178,7 +195,14 @@ module.exports = {
       });
 
       collector.on('end', async () => {
-        await message.edit({ components: [] }); // Deshabilitar los botones cuando termine el tiempo
+        try {
+          // Si el mensaje sigue estando accesible, usa `message.edit()` para deshabilitar los botones
+          if (message.channel?.isTextBased() && message.channel.viewable) {
+            await message.edit({ components: [] }); // Deshabilitar los botones
+          }
+        } catch (error) {
+          console.error("Error al actualizar los componentes:", error);
+        }
       });
 
     } catch (error) {
