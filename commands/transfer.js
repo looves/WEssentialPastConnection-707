@@ -7,7 +7,7 @@ const sharp = require('sharp');
 
 // Función para descargar y redimensionar imágenes sin texto de CopyNumber
 async function fetchImagesWithoutCopyNumber(cardData) {
-  const cardWidth = 1080; // Ancho fijo
+  const cardWidth = 1184; // Ancho fijo
   const cardHeight = 1669; // Alto fijo
 
   const imageBuffers = [];
@@ -40,7 +40,7 @@ async function combineCardImagesWithoutCopyNumber(cardData) {
     const rows = Math.ceil(cardCount / 3);
     const cols = Math.min(cardCount, 3);
 
-    const cardWidth = 1080;
+    const cardWidth = 1184;
     const cardHeight = 1669;
 
     const imageBuffers = await fetchImagesWithoutCopyNumber(cardData);
@@ -83,7 +83,9 @@ module.exports = {
     .addIntegerOption(option =>
       option.setName('coins')
         .setDescription('La cantidad de dinero que deseas transferir.')
-        .setRequired(false)),
+        .setRequired(false))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const usuario = interaction.options.getUser('user');
@@ -128,10 +130,13 @@ try {
       );
 
     // Mostrar el embed con los botones
-    await interaction.editReply({ embeds: [embedDinero], components: [rowDinero] });
+        const transferDinero = await interaction.editReply({
+          embeds: [embedDinero],
+          components: [rowDinero]
+        });
 
     const filter = i => i.user.id === usuarioIniciador.id;
-    const collector = interaction.channel.createMessageComponentCollector({ filter, time: 60000 });
+    const collector = transferDinero.createMessageComponentCollector({ filter, time: 60000, componentType: ComponentType.Button });
 
     collector.on('collect', async i => {
       if (i.customId === 'accept_transfer_money') {
@@ -194,6 +199,13 @@ try {
 
         cartasDroppadas.forEach(carta => {
           const card = carta.cardId;
+
+  // Verificar si la carta tiene un evento y asignar el emoji correspondiente
+          let emoji = rarityToEmojis(carta.rarity);  // Emoji de rareza por defecto
+          if (carta.event) {
+            emoji = rarityToEmojis(carta.event);  // Emoji de evento si está presente
+          }
+
           embedCartas.addFields({
             name: `${card.idol}<:dot:1291582825232994305> \`#${carta.copyNumber}\``,
             value: `${rarityToEmojis(carta.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${carta.uniqueCode}\`\`\``
@@ -216,13 +228,13 @@ try {
               .setStyle(ButtonStyle.Danger)
           );
 
-        await interaction.editReply({
+        const transferCartas = await interaction.editReply({
           embeds: [embedCartas],
           components: [rowCartas]
         });
 
         const filterCartas = i => i.user.id === usuarioIniciador.id;
-        const collectorCartas = interaction.channel.createMessageComponentCollector({ filter: filterCartas, time: 60000 });
+        const collectorCartas = transferCartas.createMessageComponentCollector({ filter: filterCartas, time: 60000, componentType: ComponentType.Button });
 
         collectorCartas.on('collect', async i => {
           if (i.customId === 'accept_transfer_cards') {
