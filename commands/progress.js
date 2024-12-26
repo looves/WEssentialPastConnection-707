@@ -52,7 +52,9 @@ module.exports = {
     .addStringOption(option =>
       option.setName('idol')
         .setDescription('Nombre del idol')
-        .setRequired(false)),
+        .setRequired(false))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const userId = interaction.user.id;
