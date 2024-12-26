@@ -64,8 +64,23 @@ module.exports = {
         });
       }
 
-      // Selecciona una carta aleatoria entre las cartas con rareza 2
-      const selectedCard = cards[Math.floor(Math.random() * cards.length)];
+      // Probabilidad del 8% de que la carta sea un evento
+      let selectedCard;
+      const isEvent = Math.random() < 0.08; // 8% de probabilidad
+
+      if (isEvent) {
+        // Si la probabilidad es 8%, seleccionamos una carta con evento
+        const eventCards = cards.filter(card => card.event); // Filtrar cartas que tengan un evento
+        if (eventCards.length > 0) {
+          selectedCard = eventCards[Math.floor(Math.random() * eventCards.length)];
+        } else {
+          // Si no hay cartas de evento, seleccionar una carta normal
+          selectedCard = cards[Math.floor(Math.random() * cards.length)];
+        }
+      } else {
+        // Si no es evento, seleccionamos una carta normal
+        selectedCard = cards[Math.floor(Math.random() * cards.length)];
+      }
 
       // Generar un código único para la carta obtenida
       const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity), selectedCard.event);
