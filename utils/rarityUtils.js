@@ -1,5 +1,3 @@
-// rarityUtils.js
-
 const BOOSTER_ROLE_ID = '1077366130915672165'; // Reemplaza con el ID real del rol booster
 const PATREON_ROLE_ID = '1281839512829558844'; // Reemplaza con el ID real del rol patreon
 
@@ -21,26 +19,52 @@ function getRandomRarity(probabilities) {
   }
 }
 
-async function selectCard(cards, member) {
-  const hasBoosterRole = member.roles.cache.has(BOOSTER_ROLE_ID);
-  const hasPatreonRole = member.roles.cache.has(PATREON_ROLE_ID);
+async function selectCard(cards, interaction) {
+  let member = null;
 
+  // Verificar si la interacción es en un servidor
+  if (interaction.guild) {
+    member = await interaction.guild.members.fetch(interaction.user.id);
+  }
+
+  // Selección de rareza en función de los roles si es en servidor
   let selectedRarity;
 
-  if (hasBoosterRole) {
-    selectedRarity = getRandomRarity({
-      1: 57, // Aumentar la probabilidad de común para Booster
-      2: 35, // Aumentar la probabilidad de poco común para Booster
-      3: 8  // Mantener la probabilidad de raro para Booster
-    });
-  } else if (hasPatreonRole) {
-    selectedRarity = getRandomRarity({
-      1: 48, // Aumentar la probabilidad de común para Patreon
-      2: 40, // Aumentar la probabilidad de poco común para Patreon
-      3: 12  // Aumentar la probabilidad de raro para Patreon
-    });
+  if (member) {
+    const hasBoosterRole = member.roles.cache.has(BOOSTER_ROLE_ID);
+    const hasPatreonRole = member.roles.cache.has(PATREON_ROLE_ID);
+
+    if (hasBoosterRole) {
+      selectedRarity = getRandomRarity({
+        1: 57, // Aumentar la probabilidad de común para Booster
+        2: 35, // Aumentar la probabilidad de poco común para Booster
+        3: 8  // Mantener la probabilidad de raro para Booster
+      });
+    } else if (hasPatreonRole) {
+      selectedRarity = getRandomRarity({
+        1: 48, // Aumentar la probabilidad de común para Patreon
+        2: 40, // Aumentar la probabilidad de poco común para Patreon
+        3: 12  // Aumentar la probabilidad de raro para Patreon
+      });
+    } else {
+      selectedRarity = getRandomRarity(rarityProbabilities);
+    }
   } else {
+    // Si no es en un servidor (es un DM), simplemente usa las probabilidades predeterminadas
     selectedRarity = getRandomRarity(rarityProbabilities);
+  }
+
+  // 4% de probabilidad de seleccionar una carta de tipo "event"
+  let isEventCardSelected = Math.random() < 0.04;
+
+  // Si se selecciona una carta de evento, se filtra por el campo 'event' en el modelo
+  if (isEventCardSelected) {
+    const eventCards = cards.filter(card => card.event && card.event !== '');  // Filtrar por 'event' no vacío
+
+    // Si existen cartas de tipo event, seleccionamos una de ellas
+    if (eventCards.length > 0) {
+      return eventCards[Math.floor(Math.random() * eventCards.length)];
+    } 
   }
 
   // Filtrar cartas por la rareza seleccionada
