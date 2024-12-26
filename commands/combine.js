@@ -29,7 +29,9 @@ module.exports = {
             .setDescription('Códigos de las cartas que quieres combinar (máximo 10).')
             .setRequired(true)
             .setAutocomplete(false)
-        )),
+        ))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
 
@@ -40,6 +42,7 @@ module.exports = {
         // Obtener todas las cartas del usuario con rarity '1' y '2'
         const cards = await DroppedCard.find({
           userId: userId,
+          event: { $ne: true },
           rarity: { $in: ['1', '2'] } // Filtra por rarity '1' o '2'
         }).populate('cardId');
 
@@ -99,7 +102,7 @@ module.exports = {
               const rarity1Emoji = rarityToEmojis('1');
               const card = cards.find(card => card.cardId.idol === idol);  // Obtener el primer card con ese idol
 
-              if (card) {
+              if (card && !card.event) {
                 embed.addFields(
                   { 
                     name: `<:dot:1291582825232994305> ${idol} ${card.cardId.grupo} ${card.cardId.era}\n        \`${rarity1Count}/10\` ${rarity1Emoji}`, 
@@ -114,7 +117,7 @@ module.exports = {
               const rarity2Emoji = rarityToEmojis('2');
               const card = cards.find(card => card.cardId.idol === idol);  // Obtener el primer card con ese idol
 
-              if (card) {
+              if (card && !card.event) {
                 embed.addFields(
                   { 
                     name: `<:dot:1291582825232994305> ${idol} ${card.cardId.grupo} ${card.cardId.era}\n         \`${rarity2Count}/10\` ${rarity2Emoji}`, 
@@ -172,12 +175,15 @@ module.exports = {
           });
         });
 
-        collector.on('end', () => {
-          // Desactivar botones después del tiempo de la colecta
-          message.edit({
-            embeds: [embed], 
-            components: []
-          });
+ collector.on('end', async () => {
+          try {
+            // Si el mensaje sigue estando accesible, usa `message.edit()` para deshabilitar los botones
+            if (message.channel?.isTextBased() && message.channel.viewable) {
+              await message.edit({ components: [] }); // Deshabilitar los botones
+            }
+          } catch (error) {
+            console.error("Error al actualizar los componentes:", error);
+          }
         });
     
       } catch (error) {
@@ -189,9 +195,12 @@ module.exports = {
       const codes = interaction.options.getString('codes').split(' '); // Separar los códigos por espacios
 
       try {
+
+        await interaction.deferReply();
+
         // Verificar que se proporcionen exactamente 10 cartas
         if (codes.length !== 10) {
-          return interaction.reply({
+          return interaction.followUp({
             content: 'Debes proporcionar exactamente 10 cartas de rareza 1 o 2.',
             ephemeral: true
           });
@@ -203,7 +212,8 @@ module.exports = {
         const cards = await DroppedCard.find({
           userId,
           uniqueCode: { $in: codes },
-          rarity: { $in: ['1', '2'] } // Solo cartas rarity 1 o 2
+          rarity: { $in: ['1', '2'] }, // Solo cartas rarity 1 o 2
+          event: { $ne: true } 
         }).populate('cardId'); // Aseguramos que se haga populate de cardId
 
         if (cards.length !== 10) {
@@ -220,8 +230,17 @@ module.exports = {
         const sameIdol = cards.every(card => card.cardId.idol === firstCard.cardId.idol); // Verificar idol
 
         if (!sameEra || !sameRarity || !sameIdol) {
-          return interaction.reply({
+          return interaction.followUp({
             content: 'Las cartas deben ser del mismo idol, era y rareza.',
+            ephemeral: true
+          });
+        }
+
+        // Asegurarnos de que todas las cartas no sean de evento (ya lo hemos filtrado, pero es una doble verificación)
+        const eventCards = cards.filter(card => card.event); // Filtramos las cartas de evento
+        if (eventCards.length > 0) {
+          return interaction.followUp({
+            content: 'No puedes combinar cartas de evento.',
             ephemeral: true
           });
         }
@@ -278,7 +297,7 @@ module.exports = {
         });
 
         if (!card) {
-          return interaction.reply({
+          return interaction.followUp({
             content: 'No se encontró una carta válida para la combinación.',
             ephemeral: true
           });
@@ -319,13 +338,13 @@ module.exports = {
             { name: `${rarityToEmojis(newRarity)} <:dot:1291582825232994305> \`#${copyNumber}\``, value: `\`\`\`${uniqueCode}\`\`\`` }
           );
 
-        await interaction.reply({
+        await interaction.followUp({
           embeds: [embed],
           files: [attachment]
         });
       } catch (error) {
         console.error('Error al combinar cartas:', error);
-        await interaction.reply({ content: 'Ocurrió un error al procesar la combinación de cartas.', ephemeral: true });
+        await interaction.followUp({ content: 'Ocurrió un error al procesar la combinación de cartas.', ephemeral: true });
       }
     }
   }
