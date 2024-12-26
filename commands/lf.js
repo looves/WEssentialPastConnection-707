@@ -13,7 +13,9 @@ module.exports = {
       option.setName('text')
         .setDescription('El texto que describe lo que estás buscando.')
         .setRequired(true))
-    ),
+    )
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const searchText = interaction.options.getString('text');
