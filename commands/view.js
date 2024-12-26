@@ -7,7 +7,7 @@ const sharp = require('sharp');
 
 // Función para descargar y redimensionar imágenes sin duplicados (sin CopyNumber)
 async function fetchImages(cardUrls, copyNumbers) {
-  const cardWidth = 1080;  // Ancho fijo para redimensionar
+  const cardWidth = 1184;  // Ancho fijo para redimensionar
   const cardHeight = 1669; // Alto fijo para redimensionar
 
   // Lista para almacenar los buffers de imagen
@@ -52,7 +52,7 @@ async function combineCardImages(cardUrls, copyNumbers) {
     const rows = Math.ceil(cardCount / 3);  // 3 filas máximo
     const cols = Math.min(cardCount, 3);   // 3 columnas máximo
 
-    const cardWidth = 1080;
+    const cardWidth = 1184;
     const cardHeight = 1669;
 
     // Descargar y redimensionar las imágenes sin duplicados y con el texto de copyNumber
