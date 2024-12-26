@@ -74,9 +74,9 @@ module.exports = {
 
             // Si estamos en un servidor (es decir, miembro tiene roles)
             if (member instanceof GuildMember) {
-                if (member.roles.cache.has(PATREON_ROLE_ID)) {
+                if (member.roles.cache.has('1281839512829558844')) {
                     cooldownTime = PATREON_COOLDOWN_TIME;
-                } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
+                } else if (member.roles.cache.has('1077366130915672165')) {
                     cooldownTime = BOOSTER_COOLDOWN_TIME;
                 }
             }
