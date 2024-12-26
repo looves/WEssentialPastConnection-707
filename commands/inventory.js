@@ -23,7 +23,12 @@ module.exports = {
         .setDescription('Filtra por era corta de la carta.'))
     .addStringOption(option =>
       option.setName('rarity')
-        .setDescription('Filtra por rareza de la carta.')),
+        .setDescription('Filtra por rareza de la carta.'))
+    .addStringOption(option =>
+      option.setName('event')  // Agregar filtro por evento
+        .setDescription('Filtra por evento de la carta.'))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const userId = interaction.options.getUser('user')?.id || interaction.user.id;
@@ -32,6 +37,7 @@ module.exports = {
     const eraFilter = interaction.options.getString('era');
     const eshortFilter = interaction.options.getString('eshort');
     const rarityFilter = interaction.options.getString('rarity');
+    const eventFilter = interaction.options.getString('event'); 
 
     try {
       await interaction.deferReply();
@@ -48,6 +54,7 @@ module.exports = {
       if (eraFilter) query.era = new RegExp(escapeRegex(eraFilter), 'i');
       if (eshortFilter) query.eshort = new RegExp(escapeRegex(eshortFilter), 'i');
       if (rarityFilter) query.rarity = new RegExp(escapeRegex(rarityFilter), 'i');
+      if (eventFilter) query.event = new RegExp(escapeRegex(eventFilter), 'i');
 
       // Contar el número total de cartas que coinciden con los filtros
       const totalCards = await DroppedCard.countDocuments(query);
@@ -62,21 +69,29 @@ module.exports = {
       // Función para crear el embed de la página actual
       const createEmbed = async (page) => {
         const cards = await DroppedCard.find(query)  // Buscar cartas con los filtros aplicados
-          .select('idol eshort grupo copyNumber rarity uniqueCode')  // Seleccionar solo los campos necesarios
+          .select('idol eshort grupo copyNumber rarity uniqueCode event')  // Seleccionar solo los campos necesarios
           .skip(page * maxFields)  // Omitir los resultados previos
           .limit(maxFields)  // Limitar a 9 resultados
           .lean();  // Usar lean para mejorar el rendimiento
 
         const embed = new EmbedBuilder()
-          .setAuthor({ name: `${interaction.user.username}'s Inventory`, iconURL: interaction.user.displayAvatarURL() })
+          .setAuthor({ name: `${user.username}'s Inventory`, iconURL: user.displayAvatarURL()})
           .setTimestamp()
           .setColor('#60a5fa')
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
         cards.forEach(card => {
+
+          let emoji = rarityToEmojis(card.rarity); // Emoji de rareza por defecto
+
+          // Si hay un evento, usamos el emoji del evento
+          if (card.event) {
+            emoji = rarityToEmojis(card.event); // Usamos el emoji del evento si está presente
+          }
+
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
-            value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``,
+            value: `${emoji} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\``,
             inline: true,
           });
         });
@@ -154,8 +169,14 @@ module.exports = {
       });
 
       collector.on('end', async () => {
-        // Deshabilitar los botones después de que termine el tiempo
-        await message.edit({ components: [] });
+        try {
+          // Si el mensaje sigue estando accesible, usa `message.edit()` para deshabilitar los botones
+          if (message.channel?.isTextBased() && message.channel.viewable) {
+            await message.edit({ components: [] }); // Deshabilitar los botones
+          }
+        } catch (error) {
+          console.error("Error al actualizar los componentes:", error);
+        }
       });
 
     } catch (error) {
