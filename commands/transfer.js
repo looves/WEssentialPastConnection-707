@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const DroppedCard = require('../models/DroppedCard');
 const rarityToEmojis = require('../utils/rarityToEmojis');
 const User = require('../models/User');
@@ -96,77 +96,77 @@ module.exports = {
     // Responde de forma diferida para que no haya timeout
     await interaction.deferReply();
 
-try {
-  const sender = await User.findOne({ userId: usuarioIniciador.id });
-  const recipient = await User.findOne({ userId: usuario.id });
+    try {
+      const sender = await User.findOne({ userId: usuarioIniciador.id });
+      const recipient = await User.findOne({ userId: usuario.id });
 
-  if (!sender || !recipient) {
-    return interaction.editReply({ content: 'Uno de los usuarios no tiene un perfil registrado.', ephemeral: true });
-  }
+      if (!sender || !recipient) {
+        return interaction.followUp({ content: 'Uno de los usuarios no tiene un perfil registrado.', ephemeral: true });
+      }
 
-  // Transferencia de dinero
-  if (dinero) {
-    if (sender.coins < dinero) {
-      return interaction.editReply({ content: 'No tienes suficientes monedas para realizar esta transferencia.', ephemeral: true });
-    }
+      // Transferencia de dinero
+      if (dinero) {
+        if (sender.coins < dinero) {
+          return interaction.followUp({ content: 'No tienes suficientes monedas para realizar esta transferencia.', ephemeral: true });
+        }
 
-    const embedDinero = new EmbedBuilder()
-      .setTitle('Transferencia de Monedas')
-      .setColor('#60a5fa')
-      .setDescription(`<:dot:1291582825232994305> Estás a punto de transferir **${dinero}** coins a **${usuario.username}**.`);
+        const embedDinero = new EmbedBuilder()
+          .setTitle('Transferencia de Monedas')
+          .setColor('#60a5fa')
+          .setDescription(`<:dot:1291582825232994305> Estás a punto de transferir **${dinero}** coins a **${usuario.username}**.`);
 
-    const rowDinero = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('accept_transfer_money')
-          .setLabel('Aceptar')
-          .setEmoji("<:check:1298398838570356767>")
-          .setStyle(ButtonStyle.Success),
-        new ButtonBuilder()
-          .setCustomId('cancel_transfer_money')
-          .setLabel('Rechazar')
-          .setEmoji("<:close:1290467856437481574>")
-          .setStyle(ButtonStyle.Danger)
-      );
+        const rowDinero = new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId('accept_transfer_money')
+              .setLabel('Aceptar')
+              .setEmoji("<:check:1298398838570356767>")
+              .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+              .setCustomId('cancel_transfer_money')
+              .setLabel('Rechazar')
+              .setEmoji("<:close:1290467856437481574>")
+              .setStyle(ButtonStyle.Danger)
+          );
 
-    // Mostrar el embed con los botones
+        // Enviar el mensaje con los botones
         const transferDinero = await interaction.editReply({
           embeds: [embedDinero],
           components: [rowDinero]
         });
 
-    const filter = i => i.user.id === usuarioIniciador.id;
-    const collector = transferDinero.createMessageComponentCollector({ filter, time: 60000, componentType: ComponentType.Button });
+        const filter = i => i.user.id === usuarioIniciador.id;
+        const collector = transferDinero.createMessageComponentCollector({ filter, time: 60000, componentType: ComponentType.Button });
 
-    collector.on('collect', async i => {
-      if (i.customId === 'accept_transfer_money') {
-        // Procesar la transferencia
-        sender.coins -= dinero;
-        recipient.coins = (recipient.coins || 0) + dinero;
+        collector.on('collect', async i => {
+          if (i.customId === 'accept_transfer_money') {
+            // Procesar la transferencia
+            sender.coins -= dinero;
+            recipient.coins = (recipient.coins || 0) + dinero;
 
-        await sender.save();
-        await recipient.save();
+            await sender.save();
+            await recipient.save();
 
-        // Responder con un mensaje de éxito y eliminar el embed y los botones
-        await interaction.editReply({
-          content: `_ _¡Transferencia de **${dinero}** monedas completada!_ _`,
-          embeds: [], // Eliminar el embed
-          components: [] // Eliminar los botones
+            // Responder con un mensaje de éxito y eliminar el embed y los botones
+            await interaction.editReply({
+              content: `_ _¡Transferencia de **${dinero}** monedas completada!_ _`,
+              embeds: [], // Eliminar el embed
+              components: [] // Eliminar los botones
+            });
+          } else if (i.customId === 'cancel_transfer_money') {
+            // Cancelar la transferencia y eliminar el embed y los botones
+            await interaction.editReply({
+              content: 'Transferencia de monedas cancelada.',
+              embeds: [], // Eliminar el embed
+              components: [] // Eliminar los botones
+            });
+          }
+          collector.stop(); // Detener el colector
         });
-      } else if (i.customId === 'cancel_transfer_money') {
-        // Cancelar la transferencia y eliminar el embed y los botones
-        await interaction.editReply({
-          content: 'Transferencia de monedas cancelada.',
-          embeds: [], // Eliminar el embed
-          components: [] // Eliminar los botones
-        });
-      }
-      collector.stop(); // Detener el colector
-    });
 
         collector.on('end', collected => {
           if (!collected.size) {
-            interaction.editReply({ content: 'El tiempo para aceptar la transferencia de monedas expiró.', embeds: [], components: [] });
+            interaction.editReply({ content: 'El tiempo para aceptar la transferencia expiró.', embeds: [], components: [] });
           }
         });
       }
@@ -176,7 +176,7 @@ try {
         const codigosArray = codigos.split(/\s+/).filter(codigo => codigo.trim() !== '');
 
         if (codigosArray.length > 3) {
-          return interaction.editReply({ content: 'Solo puedes transferir hasta 3 cartas a la vez.', ephemeral: true });
+          return interaction.followUp({ content: 'Solo puedes transferir hasta 3 cartas a la vez.', ephemeral: true });
         }
 
         const cartasDroppadas = await DroppedCard.find({ userId: usuarioIniciador.id, uniqueCode: { $in: codigosArray } })
@@ -200,7 +200,7 @@ try {
         cartasDroppadas.forEach(carta => {
           const card = carta.cardId;
 
-  // Verificar si la carta tiene un evento y asignar el emoji correspondiente
+          // Verificar si la carta tiene un evento y asignar el emoji correspondiente
           let emoji = rarityToEmojis(carta.rarity);  // Emoji de rareza por defecto
           if (carta.event) {
             emoji = rarityToEmojis(carta.event);  // Emoji de evento si está presente
@@ -211,6 +211,7 @@ try {
             value: `${emoji} ${card.grupo} ${card.eshort}\n\`\`\`${carta.uniqueCode}\`\`\``
           });
         });
+
 
         const combinedImageBuffer = await combineCardImagesWithoutCopyNumber(cardData);
 
@@ -228,6 +229,7 @@ try {
               .setStyle(ButtonStyle.Danger)
           );
 
+        // Enviar el mensaje con los botones
         const transferCartas = await interaction.editReply({
           embeds: [embedCartas],
           components: [rowCartas]
@@ -265,14 +267,14 @@ try {
 
         collectorCartas.on('end', collected => {
           if (!collected.size) {
-            interaction.editReply({ content: 'El tiempo para aceptar la transferencia de cartas expiró.', embeds: [], components: [] });
+            interaction.editReply({ content: 'El tiempo para aceptar la transferencia expiró.', embeds: [], components: [] });
           }
         });
       }
 
     } catch (error) {
       console.error(error);
-      interaction.editReply({ content: 'Hubo un error al procesar la transferencia.', ephemeral: true });
+      interaction.followUp({ content: 'Hubo un error al procesar la transferencia.', ephemeral: true });
     }
   },
 };
