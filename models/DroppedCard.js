@@ -8,9 +8,10 @@ const droppedCardSchema = new mongoose.Schema({
   era: { type: String, required: true, index: true },
   eshort: { type: String, required: true, index: true },
   rarity: { type: String, required: true, index: true },
+  event: { type: String, required: false, index: true },
   uniqueCode: { type: String, required: true, index: true },
   copyNumber: { type: Number, required: true, index: true },
-  command: { type: String, required: true }, // Comando en el que se dropeó la carta
+  command: { type: String, required: true },
 });
 
 module.exports = mongoose.model('DroppedCard', droppedCardSchema);
