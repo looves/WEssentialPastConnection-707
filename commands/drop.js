@@ -43,9 +43,22 @@ module.exports = {
                 return interaction.editReply(`No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
             }
 
+            // Obtener al miembro de forma segura
+            let member;
+            if (interaction.guild) { // Verificar si estamos en un servidor
+                try {
+                    member = await interaction.guild.members.fetch(userId);
+                } catch (error) {
+                    console.error('Error al obtener el miembro:', error);
+                    return interaction.editReply('No se pudo encontrar el miembro en el servidor.');
+                }
+            } else {
+                // En un DM, no necesitamos obtener el miembro del servidor
+                member = interaction.user;
+            }
+
             // Determinar el cooldown basado en el rol
             let cooldownTime = BASE_COOLDOWN_TIME;
-            const member = await interaction.guild.members.fetch(userId);
 
             if (member.roles.cache.has(PATREON_ROLE_ID)) {
                 cooldownTime = PATREON_COOLDOWN_TIME;
