@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, AttachmentBuilder, GuildMember } = require('discord.js');
 const Card = require('../models/Card');
 const DroppedCard = require('../models/DroppedCard');
 const User = require('../models/User');
@@ -11,8 +11,7 @@ const db = require('../db');
 const { selectCard } = require('../utils/rarityUtils');
 const checkBan = require('../utils/checkBan');
 
-const BOOSTER_ROLE_ID = '1077366130915672165'; // ID de rol para booster
-const PATREON_ROLE_ID = '1281839512829558844'; // ID de rol para Patreon
+
 const BASE_COOLDOWN_TIME = 8 * 60 * 1000; // 8 minutos para usuarios normales
 const BOOSTER_COOLDOWN_TIME = 6 * 60 * 1000; // 6 minutos para usuarios con rol de Booster
 const PATREON_COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutos para usuarios con rol de Patreon
@@ -27,23 +26,36 @@ module.exports = {
     async execute(interaction) {
         const userId = interaction.user.id;
         const currentTime = Date.now();
+        
+        try {
+            await interaction.deferReply();
+        } catch (error) {
+            console.error('Error al deferir la respuesta:', error);
+            return; // Termina la ejecución del comando si ocurre un error
+        }
+
+
+
+        // Asegurarse de que el usuario existe en la base de datos
+        await User.findOneAndUpdate(
+            { userId },
+            { $setOnInsert: { username: interaction.user.tag } },
+            { upsert: true }
+        );
+        const user = await User.findOne({ userId });
+
+        // Llamada a checkBan para verificar si el usuario está baneado
+        if (await checkBan(userId)) {
+            return interaction.editReply(`No puedes usar el comando \`/drop\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
+        }
 
         try {
-            await interaction.deferReply(); // Defer the reply immediately
+            const cards = await db.fetchData();
 
-            // Asegurarse de que el usuario existe en la base de datos
-            const user = await User.findOneAndUpdate(
-                { userId },
-                { $setOnInsert: { username: interaction.user.tag } },
-                { upsert: true, new: true }
-            );
-
-            // Verificar si el usuario está baneado
-            if (await checkBan(userId)) {
-                return interaction.editReply(`No puedes usar el comando </drop:1291579000044650509> porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
+            if (cards.length === 0) {
+                return interaction.editReply('No hay cartas disponibles en la base de datos.');
             }
 
-            // Obtener al miembro de forma segura
             let member;
             if (interaction.guild) { // Verificar si estamos en un servidor
                 try {
@@ -60,10 +72,13 @@ module.exports = {
             // Determinar el cooldown basado en el rol
             let cooldownTime = BASE_COOLDOWN_TIME;
 
-            if (member.roles.cache.has(PATREON_ROLE_ID)) {
-                cooldownTime = PATREON_COOLDOWN_TIME;
-            } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
-                cooldownTime = BOOSTER_COOLDOWN_TIME;
+            // Si estamos en un servidor (es decir, miembro tiene roles)
+            if (member instanceof GuildMember) {
+                if (member.roles.cache.has(PATREON_ROLE_ID)) {
+                    cooldownTime = PATREON_COOLDOWN_TIME;
+                } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
+                    cooldownTime = BOOSTER_COOLDOWN_TIME;
+                }
             }
 
             // Verificar si el usuario está en cooldown
@@ -79,25 +94,19 @@ module.exports = {
                 }
             }
 
-            // Pre-cargar las cartas desde la base de datos
-            const cards = await db.fetchData();
-            if (cards.length === 0) {
-                return interaction.editReply('No hay cartas disponibles en la base de datos.');
-            }
-
-            // Seleccionar carta aleatoria
             const selectedCard = await selectCard(cards, member);
 
             const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity), selectedCard.event);
             const cardCode = `${selectedCard.idol[0]}${selectedCard.grupo[0]}${selectedCard.era[0]}${selectedCard.event || selectedCard.rarity}`;
 
-            // Incrementar el contador de cartas y actualizar el inventario de forma paralela
+            // Incrementar el contador de cartas y actualizar el inventario
             const { copyNumber } = await incrementCardCount(userId, selectedCard._id);
+
             if (copyNumber <= 0) {
                 return interaction.editReply('No se pudo incrementar el contador de la carta.');
             }
 
-            // Crear y guardar la carta caída y las actualizaciones del inventario en paralelo
+            // Crear la carta caída
             const droppedCard = new DroppedCard({
                 userId,
                 cardId: selectedCard._id,
@@ -109,33 +118,38 @@ module.exports = {
                 event: selectedCard.event,
                 uniqueCode,
                 command: '/drop',
-                copyNumber
+                copyNumber,
             });
 
-            // Actualizar el inventario, registrar la carta caída y actualizar la fecha del último drop en paralelo
+            // Guardar la carta caída, actualizar el inventario
             await Promise.all([
                 droppedCard.save(),
-                updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }]),
-                User.findOneAndUpdate({ userId }, { lastDrop: new Date() })
+                updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }])
             ]);
 
-            // Preparar la imagen adjunta
             const imageUrl = selectedCard.image;
             const extension = getImageExtension(imageUrl);
             const attachment = new AttachmentBuilder(imageUrl, { name: `${cardCode}${extension}` });
 
-            // Determinar el nivel del usuario
+            // Lógica para determinar el level
             let level = 'level 0';
-            if (member.roles.cache.has(PATREON_ROLE_ID)) {
-                level = 'level 2';
-            } else if (member.roles.cache.has(BOOSTER_ROLE_ID)) {
-                level = 'level 1';
+
+            // Verificar si estamos en un servidor
+            if (member && member.guild) {
+                // Solo verificar los roles si estamos en un servidor
+                if (member.roles.cache.has('1281839512829558844')) { // PATREON_ROLE_ID
+                    level = 'level 2';
+                } else if (member.roles.cache.has('1077366130915672165')) { // BOOSTER_ROLE_ID
+                    level = 'level 1';
+                }
+            } else {
+                level = 'level 0';
             }
 
-            // Crear el embed con la información de la carta adquirida
+
             const embed = new EmbedBuilder()
                 .setColor('#60a5fa')
-                .setDescription(`_ _<@${interaction.user.id}>, adquiriste a \`${selectedCard.idol}\` de **${selectedCard.grupo}**\n_ _ **${selectedCard.era}** <:dot:1291582825232994305> \`#${copyNumber}\`\n_ _ \`\`\`${uniqueCode}\`\`\`\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \`${level}\``);
+                .setDescription(`_ _<@${interaction.user.id}>, adquiriste a \`${selectedCard.idol}\` de **${selectedCard.grupo}**\n_ _ **${selectedCard.era || selectedCard.event}** <:dot:1291582825232994305> \`#${copyNumber}\`**${selectedCard.rarity}**\n_ _ \`\`\`${uniqueCode}\`\`\`\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \`${level}\``);
 
             // Responder con el embed y la imagen
             await interaction.editReply({ embeds: [embed], files: [attachment] });
@@ -144,7 +158,7 @@ module.exports = {
             setTimeout(() => {
                 interaction.channel.send(`<@${userId}>, el comando </drop:1291579000044650509> ya está disponible nuevamente!`).catch(console.error);
             }, cooldownTime);
-
+            
         } catch (error) {
             console.error('Error al procesar el comando /drop:', error);
             if (error.name === 'VersionError') {
