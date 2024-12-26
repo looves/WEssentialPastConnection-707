@@ -25,7 +25,13 @@ module.exports = {
     .addStringOption(option =>
       option.setName('rarity')
         .setDescription('Rareza de la carta')
-        .setRequired(false)),
+        .setRequired(false))
+    .addStringOption(option =>
+      option.setName('event')
+       .setDescription('Filtra por evento de la carta.')
+       .setRequired(false))
+    .setIntegrationTypes([0, 1])
+    .setContexts([0, 1, 2]),
 
   async execute(interaction) {
     const idolFilter = interaction.options.getString('idol');
@@ -33,6 +39,7 @@ module.exports = {
     const eraFilter = interaction.options.getString('era');
     const eshortFilter = interaction.options.getString('eshort');
     const rarity = interaction.options.getString('rarity');
+    const eventFilter = interaction.options.getString('event');
 
     try {
       await interaction.deferReply();  // Deferir la respuesta inmediatamente
@@ -48,6 +55,7 @@ module.exports = {
       if (eraFilter) query.era = new RegExp(escapeRegex(eraFilter), 'i');
       if (eshortFilter) query.eshort = new RegExp(eshortFilter, 'i');
       if (rarity) query.rarity = rarity;
+      if (eventFilter) query.event = new RegExp(escapeRegex(eventFilter), 'i');
 
       // Total de cartas que coinciden con el filtro
       const totalCards = await DroppedCard.countDocuments(query);
@@ -64,7 +72,7 @@ module.exports = {
       // Crear embed para mostrar las cartas
       const createEmbed = async (page) => {
         const cards = await DroppedCard.find(query)  // Aplicar el filtro de búsqueda
-          .select('idol eshort grupo copyNumber rarity uniqueCode userId')  // Seleccionar solo los campos necesarios
+          .select('idol eshort grupo copyNumber rarity uniqueCode userId event')  // Seleccionar solo los campos necesarios
           .skip(page * maxFields)  // Omitir los resultados anteriores
           .limit(maxFields)  // Limitar a 9 resultados
           .lean();  // Utilizar lean para mejorar el rendimiento
@@ -76,6 +84,14 @@ module.exports = {
           .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
         cards.forEach(card => {
+          // Verificamos si la carta tiene un evento
+          let emoji = rarityToEmojis(card.rarity);  // Emoji de rareza por defecto
+
+          // Si la carta tiene evento, mostramos el emoji del evento
+          if (card.event) {
+            emoji = rarityToEmojis(card.event);  // Emoji del evento
+          }
+
           embed.addFields({
             name: `${card.idol} <:dot:1296707029087555604> \`#${card.copyNumber}\``,
             value: `${rarityToEmojis(card.rarity)} ${card.grupo} ${card.eshort}\n\`\`\`${card.uniqueCode}\`\`\` <@${card.userId}>`,
@@ -157,8 +173,14 @@ module.exports = {
       });
 
       collector.on('end', async () => {
-        // Deshabilitar los botones después de que termine el tiempo
-        await message.edit({ components: [] });
+        try {
+          // Si el mensaje sigue estando accesible, usa `message.edit()` para deshabilitar los botones
+          if (message.channel?.isTextBased() && message.channel.viewable) {
+            await message.edit({ components: [] }); // Deshabilitar los botones
+          }
+        } catch (error) {
+          console.error("Error al actualizar los componentes:", error);
+        }
       });
 
     } catch (error) {
