@@ -20,7 +20,9 @@ const PATREON_COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutos para usuarios con rol 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('drop')
-        .setDescription('Obtén una card aleatoria.'),
+        .setDescription('Obtén una card aleatoria.')
+        .setIntegrationTypes([0, 1])
+        .setContexts([0, 1, 2]),
 
     async execute(interaction) {
         const userId = interaction.user.id;
@@ -73,8 +75,8 @@ module.exports = {
             // Seleccionar carta aleatoria
             const selectedCard = await selectCard(cards, member);
 
-            const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity));
-            const cardCode = `${selectedCard.idol[0]}${selectedCard.grupo[0]}${selectedCard.era[0]}${selectedCard.rarity}`;
+            const uniqueCode = generateCardCode(selectedCard.idol, selectedCard.grupo, selectedCard.era, String(selectedCard.rarity), selectedCard.event);
+            const cardCode = `${selectedCard.idol[0]}${selectedCard.grupo[0]}${selectedCard.era[0]}${selectedCard.event || selectedCard.rarity}`;
 
             // Incrementar el contador de cartas y actualizar el inventario de forma paralela
             const { copyNumber } = await incrementCardCount(userId, selectedCard._id);
@@ -91,6 +93,7 @@ module.exports = {
                 era: selectedCard.era,
                 eshort: selectedCard.eshort,
                 rarity: selectedCard.rarity,
+                event: selectedCard.event,
                 uniqueCode,
                 command: '/drop',
                 copyNumber
