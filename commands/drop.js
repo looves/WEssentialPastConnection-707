@@ -124,7 +124,8 @@ module.exports = {
             // Guardar la carta caída, actualizar el inventario
             await Promise.all([
                 droppedCard.save(),
-                updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }])
+                updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }]),
+                User.findOneAndUpdate({ userId }, { lastDrop: new Date() })
             ]);
 
             const imageUrl = selectedCard.image;
