@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const Card = require('../models/Card');
 const DroppedCard = require('../models/DroppedCard');
+const rarityToEmojis = require('../utils/rarityToEmojis');
 
 // Función para escapar caracteres especiales en una expresión regular
 function escapeRegExp(string) {
