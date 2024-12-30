@@ -157,8 +157,16 @@ module.exports = {
 
             // Mensaje para el cooldown, programado con setTimeout
             setTimeout(() => {
-                interaction.channel.send(`<@${userId}>, el comando </drop:1291579000044650509> ya está disponible nuevamente!`).catch(console.error);
+                // Verificar si estamos en un servidor o en un DM
+                if (interaction.guild) {
+                    // Si estamos en un servidor, usamos `interaction.channel.send`
+                    interaction.channel.send(`<@${userId}>, el comando </drop:1291579000044650509> ya está disponible nuevamente!`).catch(console.error);
+                } else {
+                    // Si estamos en un DM, usamos `interaction.user.send`
+                    interaction.user.send(`¡El comando </drop:1291579000044650509> ya está disponible nuevamente!`).catch(console.error);
+                }
             }, cooldownTime);
+
             
         } catch (error) {
             console.error('Error al procesar el comando /drop:', error);
