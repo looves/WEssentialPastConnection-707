@@ -11,7 +11,6 @@ const db = require('../db');
 const { selectCard } = require('../utils/rarityUtils');
 const checkBan = require('../utils/checkBan');
 
-
 const BASE_COOLDOWN_TIME = 8 * 60 * 1000; // 8 minutos para usuarios normales
 const BOOSTER_COOLDOWN_TIME = 6 * 60 * 1000; // 6 minutos para usuarios con rol de Booster
 const PATREON_COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutos para usuarios con rol de Patreon
@@ -26,15 +25,13 @@ module.exports = {
     async execute(interaction) {
         const userId = interaction.user.id;
         const currentTime = Date.now();
-        
+
         try {
             await interaction.deferReply();
         } catch (error) {
             console.error('Error al deferir la respuesta:', error);
             return; // Termina la ejecución del comando si ocurre un error
         }
-
-
 
         // Asegurarse de que el usuario existe en la base de datos
         await User.findOneAndUpdate(
@@ -70,13 +67,13 @@ module.exports = {
             }
 
             // Determinar el cooldown basado en el rol
-            let cooldownTime = BASE_COOLDOWN_TIME;
+            let cooldownTime = BASE_COOLDOWN_TIME;  // Tiempo predeterminado para usuarios normales
 
-            // Si estamos en un servidor (es decir, miembro tiene roles)
+            // Si estamos en un servidor (es decir, el miembro tiene roles)
             if (member instanceof GuildMember) {
-                if (member.roles.cache.has('1281839512829558844')) {
+                if (member.roles.cache.has('1281839512829558844')) { // Patreon
                     cooldownTime = PATREON_COOLDOWN_TIME;
-                } else if (member.roles.cache.has('1077366130915672165')) {
+                } else if (member.roles.cache.has('1077366130915672165')) { // Booster
                     cooldownTime = BOOSTER_COOLDOWN_TIME;
                 }
             }
@@ -90,7 +87,7 @@ module.exports = {
                     const remainingTime = cooldownTime - timeElapsed;
                     const minutes = Math.floor(remainingTime / 60000);
                     const seconds = Math.floor((remainingTime % 60000) / 1000);
-                    return interaction.editReply(`¡Debes esperar ${minutes} minutos y ${seconds} segundos antes de usar el comando </drop:1291579000044650509> nuevamente!`);
+                    return interaction.editReply(`¡Debes esperar \`${minutes}\` minutos y \`${seconds}\` segundos antes de usar el comando nuevamente!`);
                 }
             }
 
@@ -147,7 +144,6 @@ module.exports = {
                 level = 'level 0';
             }
 
-
             const embed = new EmbedBuilder()
                 .setColor('#60a5fa')
                 .setDescription(`_ _<@${interaction.user.id}>, adquiriste a \`${selectedCard.idol}\` de **${selectedCard.grupo}**\n_ _ **${selectedCard.era || selectedCard.event}** <:dot:1291582825232994305> \`#${copyNumber}\`\n_ _ \`\`\`${uniqueCode}\`\`\`\n_ _　[server support](https://discord.gg/wonho) | [patreon](https://www.patreon.com/wonhobot) | \`${level}\``);
@@ -167,7 +163,6 @@ module.exports = {
                 }
             }, cooldownTime);
 
-            
         } catch (error) {
             console.error('Error al procesar el comando /drop:', error);
             if (error.name === 'VersionError') {
