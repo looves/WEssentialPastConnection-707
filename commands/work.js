@@ -91,7 +91,14 @@ module.exports = {
 
       // Configura la notificación para cuando el cooldown haya pasado
       setTimeout(() => {
-        interaction.channel.send(`<@${userId}>, el comando </work:1291579000325406797> ya está disponible nuevamente!`).catch(console.error);
+        // Verificar si estamos en un servidor o en un DM
+        if (interaction.guild) {
+          // Si estamos en un servidor, usamos `interaction.channel.send`
+          interaction.channel.send(`<@${userId}>, el comando </work:1291579000325406797> ya está disponible nuevamente!`).catch(console.error);
+        } else {
+          // Si estamos en un DM, usamos `interaction.user.send`
+          interaction.user.send(`¡El comando </work:1291579000325406797> ya está disponible nuevamente!`).catch(console.error);
+        }
       }, cooldownTime);
 
     } catch (error) {
