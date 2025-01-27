@@ -66,18 +66,7 @@ module.exports = {
                 member = interaction.user;
             }
 
-            // Determinar el cooldown basado en el rol
-            let cooldownTime = BASE_COOLDOWN_TIME;  // Tiempo predeterminado para usuarios normales
-
-            // Si estamos en un servidor (es decir, el miembro tiene roles)
-            if (member instanceof GuildMember) {
-                if (member.roles.cache.has('1281839512829558844')) { // Patreon
-                    cooldownTime = PATREON_COOLDOWN_TIME;
-                } else if (member.roles.cache.has('1077366130915672165')) { // Booster
-                    cooldownTime = BOOSTER_COOLDOWN_TIME;
-                }
-            }
-
+           
             // Verificar si el usuario está en cooldown
             if (user.lastDrop) {
                 const lastDropTime = new Date(user.lastDrop).getTime();
@@ -103,27 +92,6 @@ module.exports = {
                 return interaction.editReply('No se pudo incrementar el contador de la carta.');
             }
 
-            // Crear la carta caída
-            const droppedCard = new DroppedCard({
-                userId,
-                cardId: selectedCard._id,
-                idol: selectedCard.idol,
-                grupo: selectedCard.grupo,
-                era: selectedCard.era,
-                eshort: selectedCard.eshort,
-                rarity: selectedCard.rarity,
-                event: selectedCard.event,
-                uniqueCode,
-                command: '/drop',
-                copyNumber,
-            });
-
-            // Guardar la carta caída, actualizar el inventario
-            await Promise.all([
-                droppedCard.save(),
-                updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }]),
-                User.findOneAndUpdate({ userId }, { lastDrop: new Date() })
-            ]);
 
             const imageUrl = selectedCard.image;
             const extension = getImageExtension(imageUrl);
@@ -150,6 +118,41 @@ module.exports = {
 
             // Responder con el embed y la imagen
             await interaction.editReply({ embeds: [embed], files: [attachment] });
+
+            // Crear la carta caída
+            const droppedCard = new DroppedCard({
+                userId,
+                cardId: selectedCard._id,
+                idol: selectedCard.idol,
+                grupo: selectedCard.grupo,
+                era: selectedCard.era,
+                eshort: selectedCard.eshort,
+                rarity: selectedCard.rarity,
+                event: selectedCard.event,
+                uniqueCode,
+                command: '/drop',
+                copyNumber,
+            });
+
+            // Guardar la carta caída, actualizar el inventario
+            await Promise.all([
+                droppedCard.save(),
+                updateInventory(userId, [{ cardId: selectedCard._id, count: copyNumber }]),
+                User.findOneAndUpdate({ userId }, { lastDrop: new Date() })
+            ]);
+
+ // Determinar el cooldown basado en el rol
+            let cooldownTime = BASE_COOLDOWN_TIME;  // Tiempo predeterminado para usuarios normales
+
+            // Si estamos en un servidor (es decir, el miembro tiene roles)
+            if (member instanceof GuildMember) {
+                if (member.roles.cache.has('1281839512829558844')) { // Patreon
+                    cooldownTime = PATREON_COOLDOWN_TIME;
+                } else if (member.roles.cache.has('1077366130915672165')) { // Booster
+                    cooldownTime = BOOSTER_COOLDOWN_TIME;
+                }
+            }
+
 
             // Mensaje para el cooldown, programado con setTimeout
             setTimeout(() => {
