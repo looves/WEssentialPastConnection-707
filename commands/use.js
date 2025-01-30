@@ -24,25 +24,25 @@ async autocomplete(interaction) {
 
     // Obtener el inventario del usuario
     const inventory = await Inventory.findOne({ userId });
-    if (!inventory || !inventory.packs || inventory.packs.size === 0) {
+
+    // Verificar si `inventory` existe y `packs` es un objeto válido
+    if (!inventory || typeof inventory.packs !== 'object' || Object.keys(inventory.packs).length === 0) {
         return interaction.respond([]); // Si no tiene packs, no mostrar opciones
     }
 
-    // Obtener las claves de los packs en el Map (serán los nombres de los packs)
-    const availablePacks = [];
-    for (let packName of inventory.packs.keys()) {
+    // Obtener las claves de los packs (serán los nombres de los packs)
+    const availablePacks = Object.keys(inventory.packs).map(packName => {
         // Buscar el pack por su nombre en el array de packs
         const packInfo = packs.find(pack => pack.name === packName);
         if (packInfo) {
-            // Aquí usamos el ID del pack como valor
-            availablePacks.push({ name: packName, value: packInfo.id }); // value es el ID
+            return { name: packName, value: packInfo.id }; // value es el ID
         }
-    }
+        return null;
+    }).filter(Boolean); // Eliminar valores nulos
 
     // Limitar la respuesta a 25 opciones
     await interaction.respond(availablePacks.slice(0, 25));
 },
-
 
   async execute(interaction) {
     const userId = interaction.user.id;
