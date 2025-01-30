@@ -1,19 +1,16 @@
+// dependencias
+const keep_alive = require(`./keep_alive.js`);
 const Discord = require('discord.js');
 const fs = require('fs');
 const mongoose = require('mongoose');
-
-// Cargar la configuración desde config.json
-const config = require('./config.json');
 
 // cliente de discord
 const client = new Discord.Client({
   intents: 53608447,
 });
 
-// Conectar a MongoDB usando MONGO_URI de config.json
-mongoose.connect(config.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+// Conectar a MongoDB usando MONGO_URI de las variables de entorno
+mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 5000 // Tiempo de espera de 5 segundos
 })
   .then(() => console.log('Conectado a MongoDB'))
@@ -30,9 +27,9 @@ fs.readdirSync("./commands").forEach((commandfile) => {
 // registrar comandos globales
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord.js');
-const rest = new REST({ version: '10' }).setToken(config.CLIENT_TOKEN); // Usar CLIENT_TOKEN de config.json
+const rest = new REST({ version: '10' }).setToken(process.env.CLIENT_TOKEN); // Usar CLIENT_TOKEN de las variables de entorno
 
-const clientId = config.CLIENT_ID; // Usar CLIENT_ID de config.json
+const clientId = process.env.CLIENT_ID; // Acceder a CLIENT_ID de las variables de entorno
 
 (async () => {
   try {
@@ -84,4 +81,4 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 // conexión (token)
-client.login(config.CLIENT_TOKEN); // Usar CLIENT_TOKEN de config.json
+client.login(process.env.CLIENT_TOKEN); // Usar CLIENT_TOKEN de las variables de entorno
