@@ -19,22 +19,30 @@ module.exports = {
         .setAutocomplete(true)
     ),
 
-  async autocomplete(interaction) {
+async autocomplete(interaction) {
     const userId = interaction.user.id;
 
     // Obtener el inventario del usuario
     const inventory = await Inventory.findOne({ userId });
-    if (!inventory || !inventory.packs || Object.keys(inventory.packs).length === 0) {
-      return interaction.respond([]); // No tiene packs, no mostrar opciones
+    if (!inventory || !inventory.packs || inventory.packs.size === 0) {
+        return interaction.respond([]); // Si no tiene packs, no mostrar opciones
     }
 
-    // Obtener los nombres de los packs disponibles en el inventario
-    const availablePacks = Object.keys(inventory.packs)
-      .filter(packName => packs.some(pack => pack.name === packName)) // Solo mostrar packs válidos
-      .map(packName => ({ name: packName, value: packName }));
+    // Obtener las claves de los packs en el Map (serán los nombres de los packs)
+    const availablePacks = [];
+    for (let packName of inventory.packs.keys()) {
+        // Buscar el pack por su nombre en el array de packs
+        const packInfo = packs.find(pack => pack.name === packName);
+        if (packInfo) {
+            // Aquí usamos el ID del pack como valor
+            availablePacks.push({ name: packName, value: packInfo.id }); // value es el ID
+        }
+    }
 
-    await interaction.respond(availablePacks.slice(0, 25)); // Discord permite máx. 25 opciones
-  },
+    // Limitar la respuesta a 25 opciones
+    await interaction.respond(availablePacks.slice(0, 25));
+}
+
 
   async execute(interaction) {
     const userId = interaction.user.id;
