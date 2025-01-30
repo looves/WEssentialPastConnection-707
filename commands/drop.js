@@ -70,8 +70,10 @@ module.exports = {
             }
 
             const cards = await Card.aggregate([
-                { $match: { idol, grupo, era, eshort, event, image, count } },
-                { $sample: { size: 1 } } ]);
+                { $match: {} }, // Esto selecciona todas las cartas sin filtros.
+                { $sample: { size: 1 } } // Toma una carta aleatoria.
+                ]);
+
 
             if (cards.length === 0) return interaction.editReply('No hay cartas disponibles en la base de datos.');
 
