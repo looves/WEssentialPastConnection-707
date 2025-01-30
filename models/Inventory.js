@@ -7,7 +7,7 @@ const inventorySchema = new mongoose.Schema({
     count: { type: Number, required: true, default: 0 }
   }],
   packs: {
-    type: Map,
+    type: Object,
     of: Number, // Almacena la cantidad de cada tipo de pack, por ejemplo: { 'WPACK': 3, 'WPACKS': 1 }
     default: {},
     required: true,
