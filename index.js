@@ -1,5 +1,4 @@
 // dependencias
-const keep_alive = require(`./keep_alive.js`);
 const Discord = require('discord.js');
 const fs = require('fs');
 const mongoose = require('mongoose');
@@ -11,6 +10,7 @@ const client = new Discord.Client({
 
 // Conectar a MongoDB usando MONGO_URI de las variables de entorno
 mongoose.connect(process.env.MONGO_URI, {
+  
   serverSelectionTimeoutMS: 5000 // Tiempo de espera de 5 segundos
 })
   .then(() => console.log('Conectado a MongoDB'))
@@ -48,7 +48,7 @@ const clientId = process.env.CLIENT_ID; // Acceder a CLIENT_ID de las variables 
 
 // conexión (eventos)
 client.on('ready', () => {
-  console.log('Wonho is ready!');
+  console.log('Matthew is ready!');
   setInterval(() => {
     let status = [
       {
@@ -71,11 +71,39 @@ client.on("interactionCreate", async (interaction) => {
   if (interaction.isCommand()) {
     // Obtiene datos del comando
     const command = client.commands.get(interaction.commandName);
+
     // Ejecuta el comando
     if (command) {
-      command.execute(interaction).catch(console.error);
+      try {
+        await command.execute(interaction); // Ejecutar el comando
+      } catch (error) {
+        console.error('Error al ejecutar el comando:', error);
+        await interaction.reply({ content: 'Ocurrió un error al procesar el comando.', ephemeral: true });
+      }
     } else {
       await interaction.reply({ content: 'Comando no encontrado.', ephemeral: true });
+    }
+  }
+});
+
+// Aquí agregamos el evento `interactionCreate` para manejar autocompletado
+const { Events } = require('discord.js');  // Asegúrate de importar los eventos
+
+client.on(Events.InteractionCreate, async interaction => {
+  if (interaction.isChatInputCommand()) {
+    // Aquí se maneja la ejecución de los comandos normales
+  } else if (interaction.isAutocomplete()) {
+    const command = interaction.client.commands.get(interaction.commandName);
+
+    if (!command) {
+      console.error(`No command matching ${interaction.commandName} was found.`);
+      return;
+    }
+
+    try {
+      await command.autocomplete(interaction);
+    } catch (error) {
+      console.error(error);
     }
   }
 });
