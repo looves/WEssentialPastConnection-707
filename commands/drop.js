@@ -16,11 +16,13 @@ const WENEE_COOLDOWN_TIME = 6 * 60 * 1000;
 const SEOKI_COOLDOWN_TIME = 5 * 60 * 1000;
 
 const getCooldownTime = (member) => {
+    if (!member || !(member instanceof GuildMember)) return BASE_COOLDOWN_TIME;
     if (member.roles.cache.has('1327386590758309959')) return SEOKI_COOLDOWN_TIME;
     if (member.roles.cache.has('1281839512829558844')) return WENEE_COOLDOWN_TIME;
     if (member.roles.cache.has('1077366130915672165')) return BOOSTER_COOLDOWN_TIME;
     return BASE_COOLDOWN_TIME;
 };
+
 
 const createCardEmbed = (interaction, selectedCard, uniqueCode, copyNumber, level, imageUrl, cardCode) => {
     const extension = getImageExtension(imageUrl);
