@@ -17,7 +17,7 @@ module.exports = {
           { name: 'Rare Pack', value: 'RPACK' },
           { name: 'Ultra Pack', value: 'UPACK' },
           { name: 'Epic Pack', value: 'EPACK' },
-    )),
+        )),
   async execute(interaction) {
     const itemId = interaction.options.getString('id');
     const pack = packs.find((p) => p.id === itemId);
@@ -50,21 +50,19 @@ module.exports = {
     await user.save(); // Save updated user data to the database
 
     // Actualiza el inventario con el pack comprado
-    const userInventory = await Inventory.findOne({ userId });
+    let userInventory = await Inventory.findOne({ userId });
     if (!userInventory) {
       // Si no hay inventario, crea uno nuevo
-      const newInventory = new Inventory({
+      userInventory = new Inventory({
         userId,
-        packs: {
-          [pack.id]: 1, // Inicializa el pack con cantidad 1
-        },
+        packs: { [pack.id]: 1 }, // Inicializa el pack con cantidad 1
       });
-      await newInventory.save();
     } else {
-      // Si el inventario existe, agrega o actualiza el pack
-      userInventory.packs.set(pack.id, (userInventory.packs.get(pack.id) || 0) + 1); // Aumenta la cantidad del pack
-      await userInventory.save();
+      // Si el inventario existe, actualiza el pack usando la sintaxis de objeto
+      userInventory.packs[pack.id] = (userInventory.packs[pack.id] || 0) + 1;
     }
+
+    await userInventory.save(); // Guarda los cambios en la base de datos
 
     return interaction.reply({
       content: `Has adquirido un \`${pack.id}\` a cambio de **${pack.price}** bebegoms.\n-# ¡Buena suerte con tus packs!`,
