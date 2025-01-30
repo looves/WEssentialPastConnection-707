@@ -41,7 +41,7 @@ async autocomplete(interaction) {
 
     // Limitar la respuesta a 25 opciones
     await interaction.respond(availablePacks.slice(0, 25));
-}
+},
 
 
   async execute(interaction) {
