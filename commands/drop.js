@@ -71,10 +71,7 @@ module.exports = {
                 return interaction.editReply(`No puedes usar el comando \`/drop\` porque estás baneado.\n-# Si crees que estás baneado por error, abre ticket en Wonho's House <#1248108503973757019>.`);
             }
 
-            const cards = await Card.aggregate([
-                { $match: {} }, // Esto selecciona todas las cartas sin filtros.
-                { $sample: { size: 1 } } // Toma una carta aleatoria.
-                ]);
+            const cards = await Card.find();
 
 
             if (cards.length === 0) return interaction.editReply('No hay cartas disponibles en la base de datos.');
