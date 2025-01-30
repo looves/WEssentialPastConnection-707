@@ -21,19 +21,19 @@ module.exports = {
 
   async autocomplete(interaction) {
     const userId = interaction.user.id;
-    const inventory = await Inventory.findOne({ userId });
 
-    if (!inventory || !inventory.packs) {
-      return interaction.respond([]);
+    // Obtener el inventario del usuario
+    const inventory = await Inventory.findOne({ userId });
+    if (!inventory || !inventory.packs || Object.keys(inventory.packs).length === 0) {
+      return interaction.respond([]); // No tiene packs, no mostrar opciones
     }
 
-    // Obtener los IDs de las cajas que el usuario tiene en su inventario
-    const boxOptions = Object.keys(inventory.packs).map(boxCode => ({
-      name: boxCode,
-      value: boxCode,
-    }));
+    // Obtener los nombres de los packs disponibles en el inventario
+    const availablePacks = Object.keys(inventory.packs)
+      .filter(packName => packs.some(pack => pack.name === packName)) // Solo mostrar packs válidos
+      .map(packName => ({ name: packName, value: packName }));
 
-    return interaction.respond(boxOptions.slice(0, 25)); // Discord solo permite hasta 25 opciones
+    await interaction.respond(availablePacks.slice(0, 25)); // Discord permite máx. 25 opciones
   },
 
   async execute(interaction) {
